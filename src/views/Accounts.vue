@@ -13,7 +13,11 @@ const router = useRouter()
 onMounted(() => accountStore.fetchAccountTree())
 
 function onSelect(node: AccountNode) {
-  router.push({ name: "account-ledger", params: { accountId: node.id } })
+  if (node.children && node.children.length > 0) {
+    router.push({ name: "account-detail", params: { accountId: node.id } })
+  } else {
+    router.push({ name: "account-ledger", params: { accountId: node.id } })
+  }
 }
 </script>
 

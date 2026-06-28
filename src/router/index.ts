@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { title: "New Account" },
     },
     {
+      path: "/accounts/:accountId",
+      name: "account-detail",
+      component: () => import("@/views/AccountDetail.vue"),
+      meta: { title: "Account Detail" },
+    },
+    {
       path: "/ledger",
       name: "ledger",
       component: () => import("@/views/Ledger.vue"),
