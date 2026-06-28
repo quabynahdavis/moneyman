@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { ref } from "vue"
+import { ref, computed } from "vue"
 import { ChevronRight } from "@lucide/vue"
 import { Badge, Button } from "@/components/ui"
 import { formatMoney, isNegative } from "@/utils/decimal"
 import { ACCOUNT_TYPE_LABELS } from "@/types"
 import type { AccountNode } from "@/types"
 
-defineOptions({ name: "AccountTree" })
-
 const props = defineProps<{
   nodes: AccountNode[]
-  depth?: number
 }>()
 
 const emit = defineEmits<{
@@ -19,64 +16,87 @@ const emit = defineEmits<{
 
 const expanded = ref<Set<number>>(new Set())
 
-function toggle(id: number) {
+function collectDescendantIds(node: AccountNode): number[] {
+  const ids: number[] = [node.id]
+  if (node.children) {
+    for (const child of node.children) {
+      ids.push(...collectDescendantIds(child))
+    }
+  }
+  return ids
+}
+
+function toggle(node: AccountNode) {
+  const ids = collectDescendantIds(node)
   const s = new Set(expanded.value)
-  if (s.has(id)) s.delete(id); else s.add(id)
+  // If node is expanded, collapse it and all descendants
+  // If node is collapsed, expand it and all descendants
+  if (s.has(node.id)) {
+    for (const id of ids) s.delete(id)
+  } else {
+    for (const id of ids) s.add(id)
+  }
   expanded.value = s
 }
+
+function isOpen(id: number) {
+  return expanded.value.has(id)
+}
+
+const flatRows = computed(() => {
+  const result: { node: AccountNode; depth: number }[] = []
+  function walk(nodes: AccountNode[], depth: number) {
+    for (const node of nodes) {
+      result.push({ node, depth })
+      if (node.children && node.children.length > 0 && isOpen(node.id)) {
+        walk(node.children, depth + 1)
+      }
+    }
+  }
+  walk(props.nodes, 0)
+  return result
+})
 </script>
 
 <template>
-  <div>
+  <div role="tree">
     <div
-      v-for="node in nodes"
-      :key="node.id"
-      class="border-b last:border-b-0"
+      v-for="item in flatRows"
+      :key="item.node.id"
+      role="treeitem"
+      :aria-expanded="item.node.children && item.node.children.length > 0 ? isOpen(item.node.id) : undefined"
     >
-      <!-- Header row -->
       <div
-        class="flex items-center gap-2 px-4 py-2.5 hover:bg-muted/50 cursor-pointer select-none text-sm"
-        :class="{ 'opacity-60 italic': node.isPlaceholder }"
-        :style="{ paddingLeft: `${(depth ?? 0) * 24 + 16}px` }"
-        @click="toggle(node.id)"
+        class="flex items-center gap-2 px-4 py-2.5 hover:bg-muted/50 cursor-pointer select-none text-sm border-b last:border-b-0 group"
+        :class="{ 'opacity-60 italic': item.node.isPlaceholder }"
+        :style="{ paddingLeft: `${item.depth * 24 + 16}px` }"
+        @click="toggle(item.node)"
       >
         <div class="w-4 h-4 flex items-center justify-center shrink-0">
           <ChevronRight
-            v-if="node.children && node.children.length > 0"
+            v-if="item.node.children && item.node.children.length > 0"
             class="h-4 w-4 text-muted-foreground transition-transform duration-150"
-            :class="{ 'rotate-90': expanded.has(node.id) }"
+            :class="{ 'rotate-90': isOpen(item.node.id) }"
           />
         </div>
 
-        <span v-if="node.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ node.code }}</span>
+        <span v-if="item.node.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ item.node.code }}</span>
 
-        <span class="flex-1 font-medium truncate">{{ node.name }}</span>
+        <span class="flex-1 font-medium truncate">{{ item.node.name }}</span>
 
-        <Badge variant="secondary" class="text-xs shrink-0">{{ ACCOUNT_TYPE_LABELS[node.accountType] }}</Badge>
+        <Badge variant="secondary" class="text-xs shrink-0">{{ ACCOUNT_TYPE_LABELS[item.node.accountType] }}</Badge>
 
         <span
           class="font-mono tabular-nums text-right w-28 shrink-0"
-          :class="isNegative(node.balance) ? 'text-rose-500' : ''"
-        >{{ formatMoney(node.balance) }}</span>
+          :class="isNegative(item.node.balance) ? 'text-rose-500' : ''"
+        >{{ formatMoney(item.node.balance) }}</span>
 
         <Button
           variant="ghost"
           size="sm"
-          class="h-7 px-2 opacity-0 hover:opacity-100 shrink-0"
-          @click.stop="emit('select', node)"
+          class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0"
+          @click.stop="emit('select', item.node)"
         >View</Button>
-      </div>
-
-      <!-- Children (accordion body) -->
-      <div
-        v-if="node.children && node.children.length > 0 && expanded.has(node.id)"
-        class="overflow-hidden"
-      >
-        <AccountTree
-          :nodes="node.children"
-          :depth="(depth ?? 0) + 1"
-          @select="emit('select', $event)"
-        />
       </div>
     </div>
   </div>
