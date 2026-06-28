@@ -46,7 +46,7 @@ async function save() {
 </script>
 
 <template>
-  <div class="max-w-lg space-y-6">
+  <div class="space-y-6">
     <div v-if="error" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{{ error }}</div>
 
     <div class="space-y-1">

@@ -72,7 +72,7 @@ async function save() {
 </script>
 
 <template>
-  <div class="max-w-2xl space-y-6">
+  <div class="space-y-6">
     <div v-if="error" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
       <AlertCircle class="h-4 w-4 mt-0.5 shrink-0" />{{ error }}
     </div>
