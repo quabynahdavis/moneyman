@@ -29,12 +29,16 @@ const route = useRoute()
 // Custom navigation stack (not browser history)
 const navStack = ref<string[]>([])
 const navIndex = ref(-1)
+const isProgrammaticNav = ref(false)
 
 watch(
   () => route.fullPath,
   (to, from) => {
+    if (isProgrammaticNav.value) {
+      isProgrammaticNav.value = false
+      return
+    }
     if (from && to !== from) {
-      // Trim any forward entries if we navigated after going back
       if (navIndex.value < navStack.value.length - 1) {
         navStack.value = navStack.value.slice(0, navIndex.value + 1)
       }
@@ -51,6 +55,7 @@ const canGoForward = computed(() => navIndex.value < navStack.value.length - 1)
 function goBack() {
   if (canGoBack.value) {
     navIndex.value--
+    isProgrammaticNav.value = true
     router.replace(navStack.value[navIndex.value])
   }
 }
@@ -58,6 +63,7 @@ function goBack() {
 function goForward() {
   if (canGoForward.value) {
     navIndex.value++
+    isProgrammaticNav.value = true
     router.replace(navStack.value[navIndex.value])
   }
 }

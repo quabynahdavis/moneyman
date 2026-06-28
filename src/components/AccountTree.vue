@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue"
 import { ChevronRight } from "@lucide/vue"
-import { Badge } from "@/components/ui"
+import { Badge, Button } from "@/components/ui"
 import { formatMoney, isNegative } from "@/utils/decimal"
 import { ACCOUNT_TYPE_LABELS } from "@/types"
 import type { AccountNode } from "@/types"
@@ -43,7 +43,7 @@ function isOpen(id: number) {
 
 function onRowClick(node: AccountNode) {
   if (node.children && node.children.length > 0) {
-    emit("select", node)
+    toggle(node)
   }
 }
 
@@ -100,6 +100,13 @@ const flatRows = computed(() => {
           class="font-mono tabular-nums text-right w-28 shrink-0"
           :class="isNegative(item.node.balance) ? 'text-rose-500' : ''"
         >{{ formatMoney(item.node.balance) }}</span>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0"
+          @click.stop="emit('select', item.node)"
+        >View</Button>
       </div>
     </div>
   </div>
