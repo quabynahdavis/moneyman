@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card.vue"
-import { Button } from "@/components/ui/Button.vue"
-import { Badge } from "@/components/ui/Badge.vue"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Badge } from "@/components/ui"
 import { CalendarClock, Plus } from "@lucide/vue"
 
 const scheduled = [

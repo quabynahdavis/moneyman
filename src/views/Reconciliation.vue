@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card.vue"
-import { Button } from "@/components/ui/Button.vue"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button } from "@/components/ui"
 import { Wallet, ArrowRight } from "@lucide/vue"
 </script>
 

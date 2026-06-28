@@ -1,5 +1,4 @@
 import type { Account, AccountTreeNode, Split, Transaction } from "@/types"
-import { getAccountNormalBalance } from "@/types"
 import { Decimal, toDecimal } from "@/utils/decimal"
 
 export function useAccountingEngine() {

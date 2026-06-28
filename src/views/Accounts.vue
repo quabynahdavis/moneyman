@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card.vue"
-import { Badge } from "@/components/ui/Badge.vue"
-import { Button } from "@/components/ui/Button.vue"
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "@/components/ui"
 import { useAccountStore } from "@/stores/accountStore"
 import { formatMoney, isNegative } from "@/utils/decimal"
 import { useRouter } from "vue-router"

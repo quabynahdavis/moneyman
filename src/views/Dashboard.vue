@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card.vue"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui"
 import { ArrowUp, Wallet, TrendingUp, TrendingDown, PiggyBank } from "@lucide/vue"
 
 const sampleNetWorth = "$24,582.32"

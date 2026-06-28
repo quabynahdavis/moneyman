@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, h } from "vue"
 import {
-  createColumnHelper,
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
@@ -10,16 +9,19 @@ import {
   type SortingState,
   type ExpandedState,
 } from "@tanstack/vue-table"
-import Table from "@/components/ui/Table.vue"
-import TableBody from "@/components/ui/TableBody.vue"
-import TableCell from "@/components/ui/TableCell.vue"
-import TableHead from "@/components/ui/TableHead.vue"
-import TableHeader from "@/components/ui/TableHeader.vue"
-import TableRow from "@/components/ui/TableRow.vue"
-import { Badge } from "@/components/ui/Badge.vue"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Badge,
+} from "@/components/ui"
 import { ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "@lucide/vue"
 import type { Transaction } from "@/types"
 import { formatMoney } from "@/utils/decimal"
+import Decimal from "decimal.js"
 
 interface LedgerRow {
   id: string
@@ -48,79 +50,19 @@ const expanded = ref<ExpandedState>({})
 const globalFilter = ref("")
 const rowSelection = ref({})
 
-const columnHelper = createColumnHelper<LedgerRow>()
+const columns = [
+  { accessorKey: "date", header: "Date", enableSorting: true },
+  { accessorKey: "number", header: "Num", enableSorting: true },
+  { accessorKey: "payee", header: "Payee", enableSorting: true },
+  { accessorKey: "description", header: "Description" },
+  { accessorKey: "accountName", header: "Account" },
+  { accessorKey: "memo", header: "Memo" },
+  { accessorKey: "debit", header: "Debit", enableSorting: true },
+  { accessorKey: "credit", header: "Credit", enableSorting: true },
+  { accessorKey: "state", header: "State", enableSorting: true },
+]
 
-const columns = computed(() => {
-  const cols = [
-    columnHelper.accessor("date", {
-      header: "Date",
-      cell: (info) => info.getValue(),
-      enableSorting: true,
-    }),
-    columnHelper.accessor("number", {
-      header: "Num",
-      cell: (info) => info.getValue() || "",
-      enableSorting: true,
-    }),
-    columnHelper.accessor("payee", {
-      header: "Payee",
-      cell: (info) => info.getValue() || "",
-      enableSorting: true,
-    }),
-    columnHelper.accessor("description", {
-      header: "Description",
-      cell: (info) => info.getValue() || "",
-    }),
-  ]
-
-  if (props.showAccountColumn) {
-    cols.push(
-      columnHelper.accessor("accountName", {
-        header: "Account",
-        cell: (info) => info.getValue() || "",
-      }),
-    )
-  }
-
-  cols.push(
-    columnHelper.accessor("memo", {
-      header: "Memo",
-      cell: (info) => info.getValue() || "",
-    }),
-    columnHelper.accessor("debit", {
-      header: "Debit",
-      cell: (info) => {
-        const val = info.getValue()
-        return val && val !== "0" ? formatMoney(val) : ""
-      },
-      enableSorting: true,
-    }),
-    columnHelper.accessor("credit", {
-      header: "Credit",
-      cell: (info) => {
-        const val = info.getValue()
-        return val && val !== "0" ? formatMoney(val) : ""
-      },
-      enableSorting: true,
-    }),
-    columnHelper.accessor("state", {
-      header: "State",
-      cell: (info) => {
-        const state = info.getValue()
-        const variant = state === "RECONCILED" ? "success"
-          : state === "CLEARED" ? "warning"
-          : state === "VOID" ? "destructive"
-          : "secondary"
-        return h(Badge, { variant }, () => state)
-      },
-      enableSorting: true,
-    }),
-  )
-
-  return cols
-})
-
-const ledgerRows = computed<LedgerRow[]>(() => {
+const ledgerRows = computed(() => {
   const rows: LedgerRow[] = []
   for (const txn of props.transactions) {
     rows.push({
@@ -132,13 +74,12 @@ const ledgerRows = computed<LedgerRow[]>(() => {
       number: txn.number,
       description: txn.description,
       memo: null,
-      debit: txn.splits.reduce((sum, s) => (sum.plus(s.debitAmount || "0")), new Decimal(0)).toString(),
-      credit: txn.splits.reduce((sum, s) => (sum.plus(s.creditAmount || "0")), new Decimal(0)).toString(),
+      debit: txn.splits.reduce((sum, s) => sum.plus(s.debitAmount || "0"), new Decimal(0)).toString(),
+      credit: txn.splits.reduce((sum, s) => sum.plus(s.creditAmount || "0"), new Decimal(0)).toString(),
       state: txn.state,
       isSubRow: false,
       accountName: undefined,
     })
-
     for (const split of txn.splits) {
       rows.push({
         id: `split-${txn.id}-${split.id || 0}`,
@@ -161,43 +102,62 @@ const ledgerRows = computed<LedgerRow[]>(() => {
   return rows
 })
 
+const visibleColumns = computed(() => {
+  return props.showAccountColumn ? columns : columns.filter((c) => c.accessorKey !== "accountName")
+})
+
 const table = useVueTable({
-  get data() { return ledgerRows.value },
-  columns: columns.value,
+  get data() { return ledgerRows.value as LedgerRow[] },
+  columns: visibleColumns.value as any[],
   state: {
-    get sorting() { return sorting.value },
-    set sorting(updater) { sorting.value = typeof updater === "function" ? updater(sorting.value) : updater },
-    get expanded() { return expanded.value },
-    set expanded(updater) { expanded.value = typeof updater === "function" ? updater(expanded.value) : updater },
-    get globalFilter() { return globalFilter.value },
-    set globalFilter(updater) { globalFilter.value = typeof updater === "function" ? updater(globalFilter.value) : updater },
-    get rowSelection() { return rowSelection.value },
-    set rowSelection(updater) { rowSelection.value = typeof updater === "function" ? updater(rowSelection.value) : updater },
+    sorting: sorting as any,
+    expanded: expanded as any,
+    globalFilter: globalFilter as any,
+    rowSelection: rowSelection as any,
+  },
+  onSortingChange: (updater: any) => {
+    sorting.value = typeof updater === "function" ? updater(sorting.value) : updater
+  },
+  onExpandedChange: (updater: any) => {
+    expanded.value = typeof updater === "function" ? updater(expanded.value) : updater
+  },
+  onGlobalFilterChange: (updater: any) => {
+    globalFilter.value = typeof updater === "function" ? updater(globalFilter.value) : updater
   },
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   getFilteredRowModel: getFilteredRowModel(),
   getExpandedRowModel: getExpandedRowModel(),
-  getSubRows: (row) => row.type === "transaction" ? ledgerRows.value.filter((r) => r.type === "split" && r.txnId === row.txnId) : [],
+  getSubRows: (row: any) => row.type === "transaction"
+    ? ledgerRows.value.filter((r: LedgerRow) => r.type === "split" && r.txnId === row.txnId)
+    : [],
   enableExpanding: true,
   enableSorting: true,
   enableMultiSort: false,
   enableRowSelection: false,
 })
 
+function formatCellValue(cell: any, columnId: string): string {
+  const val = cell.getValue() as string
+  if (columnId === "debit") {
+    return val && val !== "0" ? formatMoney(val) : ""
+  }
+  if (columnId === "credit") {
+    return val && val !== "0" ? formatMoney(val) : ""
+  }
+  return val || ""
+}
+
 function toggleRow(rowId: string) {
-  const current = { ...expanded.value }
-  current[rowId] = !current[rowId]
-  expanded.value = current
+  const current: Record<string, boolean> = expanded.value as Record<string, boolean>
+  expanded.value = { ...current, [rowId]: !current[rowId] } as any
 }
 
 function getSortIcon(columnId: string) {
-  const sort = sorting.value.find((s) => s.id === columnId)
+  const sort = sorting.value.find((s: { id: string }) => s.id === columnId)
   if (!sort) return ArrowUpDown
   return sort.desc ? ArrowDown : ArrowUp
 }
-
-import Decimal from "decimal.js"
 </script>
 
 <template>
@@ -209,7 +169,6 @@ import Decimal from "decimal.js"
         class="h-9 rounded-md border bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-64"
       />
     </div>
-
     <div class="rounded-md border">
       <Table>
         <TableHeader>
@@ -221,10 +180,10 @@ import Decimal from "decimal.js"
                 @click="header.column.getToggleSortingHandler()?.($event)"
               >
                 <component :is="getSortIcon(header.column.id)" class="h-3 w-3" />
-                {{ header.isPlaceholder ? "" : (header.column.columnDef.header as string) }}
+                {{ header.isPlaceholder ? "" : header.column.columnDef.header as string }}
               </button>
               <span v-else>
-                {{ header.isPlaceholder ? "" : (header.column.columnDef.header as string) }}
+                {{ header.isPlaceholder ? "" : header.column.columnDef.header as string }}
               </span>
             </TableHead>
           </TableRow>
@@ -253,7 +212,7 @@ import Decimal from "decimal.js"
                     {{ cell.getValue() as string }}
                   </div>
                   <span v-else>
-                    {{ cell.getValue() as string }}
+                    {{ formatCellValue(cell, cell.column.id) }}
                   </span>
                 </TableCell>
               </TableRow>
@@ -266,7 +225,7 @@ import Decimal from "decimal.js"
                   :key="cell.id"
                 >
                   <span class="text-muted-foreground">
-                    {{ cell.getValue() as string }}
+                    {{ formatCellValue(cell, cell.column.id) }}
                   </span>
                 </TableCell>
               </TableRow>

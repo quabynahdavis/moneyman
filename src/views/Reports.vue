@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card.vue"
-import { Button } from "@/components/ui/Button.vue"
+import { Card, CardContent, CardHeader, CardTitle, Button } from "@/components/ui"
 import { BarChart3, Table2, Download } from "@lucide/vue"
 
 const activeReport = ref<string | null>(null)

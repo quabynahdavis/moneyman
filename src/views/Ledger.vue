@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useRoute } from "vue-router"
-import { Card, CardContent } from "@/components/ui/Card.vue"
-import { Button } from "@/components/ui/Button.vue"
+import { Card, CardContent, Button } from "@/components/ui"
 import { useTransactionStore } from "@/stores/transactionStore"
 import { useAccountStore } from "@/stores/accountStore"
 import SplitLedgerTable from "@/components/SplitLedgerTable.vue"
