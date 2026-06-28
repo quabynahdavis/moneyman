@@ -6,7 +6,7 @@ The full DDL is in [`database-schema.sql`](../../database-schema.sql).
 
 ```
 accounts (adjacency list)
-  ↳ parent_id → accounts.id
+  ↳ parent_id → accounts.id (ON DELETE RESTRICT)
   ↳ splits (1:N)
 
 transactions
@@ -37,6 +37,7 @@ price_quotes
 ## Key Design Points
 
 - **`debit_amount` / `credit_amount`** are stored as TEXT (decimal strings), not REAL.
-- **`placeholder`** on accounts prevents posting transactions to parent nodes.
-- **`v_account_balances`** uses a recursive CTE to roll up leaf-node balances to every ancestor.
-- **`v_transaction_splits`** joins transactions, splits, and accounts for the ledger display.
+- **`is_placeholder`** on accounts prevents posting transactions to parent nodes (formerly named `placeholder`, migrated via schema v1→v2).
+- **account_type** has a CHECK constraint enforcing the fixed set of GnuCash type codes.
+- **Recursive CTE balance rollup** — The `list_accounts` and `get_account_tree` commands use a recursive CTE to sum leaf balances up the hierarchy.
+- **Schema versioning** — The `schema_version` table tracks the current version; migrations in `schema.rs` run sequentially on startup.

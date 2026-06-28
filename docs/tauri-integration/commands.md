@@ -1,28 +1,26 @@
 # Tauri Commands
 
-## Current
+## Accounts
 
-The Rust backend currently exposes a single greeting command:
+| Command | Payload | Returns | Description |
+|---|---|---|---|
+| `list_accounts` | — | `Vec<Account>` | Flat list with recursive CTE balance rollup |
+| `get_account_tree` | — | `Vec<AccountNode>` | Nested tree built server-side from adjacency list |
+| `create_account` | `CreateAccountPayload` | `Account` | Insert new account |
+| `update_account` | `UpdateAccountPayload` | `Account` | Partial update |
 
-```rust
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-```
+## Transactions
 
-## Planned Commands
+| Command | Payload | Returns | Description |
+|---|---|---|---|
+| `post_transaction` | `CreateTransactionPayload` | `Transaction` | Insert transaction + splits; validates balance |
+| `list_transactions` | `ListTransactionsQuery` | `PaginatedTransactions` | Paginated, filtered, sorted query |
+| `void_transaction` | `id: i64` | — | Soft-delete (sets state = "VOID") |
+| `get_dashboard_summary` | — | `serde_json::Value` | Net worth, income, expenses, cash |
 
-| Command | Purpose |
-|---|---|
-| `list_accounts` | Fetch full account tree with balances |
-| `create_account` | Insert new account |
-| `update_account` | Edit account metadata |
-| `post_transaction` | Insert transaction + splits |
-| `void_transaction` | Soft-delete transaction |
-| `list_transactions` | Paginated, filterable query |
-| `start_reconciliation` | Begin reconciliation session |
-| `complete_reconciliation` | Finalize reconciliation |
-| `import_ofx` | Parse and import OFX/QIF/CSV |
-| `fetch_quote` | Get latest price from API |
-| `get_budget_report` | Aggregated budget vs actuals |
+## Conventions
+
+- All commands are registered in `lib.rs` via `generate_handler![]`.
+- Snake_case JSON keys (Serde convention); the frontend `api.ts` translates camelCase → snake_case.
+- Database connection is injected via `tauri::State<Database>`.
+- Monetary values are returned as decimal strings — never `f64`.

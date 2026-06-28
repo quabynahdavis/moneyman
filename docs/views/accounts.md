@@ -4,21 +4,22 @@ Route: `/accounts`
 
 ## Purpose
 
-Displays the Chart of Accounts as an interactive hierarchical tree with live balance rollups.
+Displays the Chart of Accounts as an interactive hierarchical tree using `AccountTree.vue`, with live balance rollups from the Rust backend.
 
 ## Features
 
-- **Expand/Collapse** — Click parent accounts to show/hide children
-- **Account Type Badge** — Color-coded type indicator
-- **Balance Display** — Right-aligned monospace figures (red for negative)
-- **View Button** — Hover to navigate to account-specific register
-- **New Account Button** — (placeholder for future dialog)
+- **Accordion Toggle** — Click the chevron to fold/unfold a parent and all its descendants; clicking the row itself also toggles
+- **Placeholder Dimming** — Accounts with `isPlaceholder === true` render at `opacity-60 italic`
+- **Sub-Account Drilldown** — Hover "View" button navigates parents to `/accounts/:id` (immediate children table) and leaves to `/ledger/:id`
+- **Right-Aligned Balances** — Monospace `tabular-nums`, negative values in `text-rose-500`
+- **Type Badges** — Each account shows its GnuCash type as a `Badge`
+- **Refresh / New Account** — Header toolbar buttons
 
 ## State Dependencies
 
-- `accountStore.accounts` — Flat list
-- `accountStore.accountTree` — Computed nested tree
+- `accountStore.treeWithRollup` — Recursive tree with rollup balances
+- `accountStore.loading` / `accountStore.error`
 
 ## Implementation
 
-The tree is flattened into a `flatTree` computed for rendering. Depth is tracked for indentation. The `expanded` ref holds a `Set<number>` of expanded node IDs.
+The tree is rendered via a depth-tracked `flatRows` computed. A single `expanded: Set<number>` ref controls which nodes are visible. Clicking the row calls `toggle(node)`, which uses `collectDescendantIds` to fold/unfold the entire subtree in one set operation.

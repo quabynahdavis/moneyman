@@ -21,16 +21,21 @@ type AccountType =
 | `name` | `string` | Account name |
 | `description` | `string \| null` | Optional description |
 | `currencyCode` | `string` | ISO 4217 currency |
-| `placeholder` | `boolean` | Parent-only (no txns) |
+| `isPlaceholder` | `boolean` | Parent-only structural node (no txns) |
 | `isActive` | `boolean` | Soft delete |
 | `sortOrder` | `number` | Display order |
 | `balance` | `string` | Computed decimal balance |
+| `createdAt` | `string` | ISO timestamp |
+| `updatedAt` | `string` | ISO timestamp |
 
-## `AccountTreeNode`
+## `AccountNode`
 
-Extends `Account` with:
-- `children: AccountTreeNode[]`
-- `depth: number`
+Recursive tree node, mirrors the Rust `AccountNode` struct:
+
+| Field | Type | Description |
+|---|---|---|
+| *(all Account fields)* | — | Same as `Account` (without timestamps) |
+| `children` | `AccountNode[] \| undefined` | Sub-account nodes; `undefined` for leaves |
 
 ## Helpers
 
