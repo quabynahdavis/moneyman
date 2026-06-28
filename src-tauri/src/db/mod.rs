@@ -24,12 +24,12 @@ impl Database {
     fn initialize(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
 
-        // Create tables
+        // Create tables (IF NOT EXISTS so existing tables are preserved)
         for stmt in schema::CREATE_TABLES {
             conn.execute_batch(stmt)?;
         }
 
-        // Check schema version
+        // Check current schema version
         let current_version: i64 = conn
             .query_row(
                 "SELECT COALESCE(MAX(version), 0) FROM schema_version",
@@ -38,8 +38,8 @@ impl Database {
             )
             .unwrap_or(0);
 
-        if current_version < schema::SCHEMA_VERSION {
-            // Insert seed data
+        if current_version == 0 {
+            // Fresh database: insert seed data and stamp latest version
             for stmt in schema::INSERT_SEED_DATA {
                 conn.execute_batch(stmt)?;
             }
@@ -47,6 +47,19 @@ impl Database {
                 "INSERT INTO schema_version (version) VALUES (?1)",
                 [schema::SCHEMA_VERSION],
             )?;
+        } else {
+            // Existing database: run pending migrations sequentially
+            for (target_version, migration_stmts) in schema::MIGRATIONS {
+                if current_version < *target_version {
+                    for stmt in *migration_stmts {
+                        conn.execute_batch(stmt)?;
+                    }
+                    conn.execute(
+                        "INSERT INTO schema_version (version) VALUES (?1)",
+                        [*target_version],
+                    )?;
+                }
+            }
         }
 
         Ok(())

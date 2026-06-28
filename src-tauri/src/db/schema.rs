@@ -123,4 +123,15 @@ pub const INSERT_SEED_DATA: &[&str] = &[
     "INSERT OR IGNORE INTO accounts (id, parent_id, account_type, code, name, currency_code, is_placeholder) VALUES (16, 12, 'EXPENSE', '5400', 'Utilities', 'USD', 0)",
 ];
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
+
+// Each entry runs only when the stored version is less than the key.
+// Keys must be sequential, starting from the first version to migrate.
+pub const MIGRATIONS: &[(i64, &[&str])] = &[
+    (
+        2,
+        &[
+            "ALTER TABLE accounts RENAME COLUMN placeholder TO is_placeholder",
+        ],
+    ),
+];
