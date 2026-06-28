@@ -14,6 +14,8 @@ import {
   Sun,
   Moon,
   Search,
+  ArrowLeft,
+  ArrowRight,
 } from "@lucide/vue"
 import { computed } from "vue"
 import { useRouter, useRoute } from "vue-router"
@@ -21,6 +23,8 @@ import { useRouter, useRoute } from "vue-router"
 const ui = useUiStore()
 const router = useRouter()
 const route = useRoute()
+
+const canGoBack = computed(() => window.history.length > 1)
 
 const navItems = [
   { name: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -98,8 +102,21 @@ function toggleTheme() {
     </aside>
 
     <main class="flex flex-1 flex-col overflow-hidden">
-      <header class="flex h-14 items-center border-b bg-card px-6 gap-4">
-        <h1 class="text-lg font-semibold">
+      <header class="flex h-14 items-center border-b bg-card px-4 gap-2">
+        <button
+          class="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-30"
+          :disabled="!canGoBack"
+          @click="router.back()"
+        >
+          <ArrowLeft class="h-4 w-4" />
+        </button>
+        <button
+          class="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          @click="router.forward()"
+        >
+          <ArrowRight class="h-4 w-4" />
+        </button>
+        <h1 class="text-lg font-semibold ml-1">
           {{ route.meta.title || "Moneyman" }}
         </h1>
         <div class="ml-auto flex items-center gap-2">
