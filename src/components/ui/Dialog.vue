@@ -12,14 +12,19 @@ import {
 } from "reka-ui"
 import { computed, type HTMLAttributes } from "vue"
 
-interface DialogContentExtendedProps extends DialogContentProps {
+interface DialogProps {
+  open?: boolean
   class?: HTMLAttributes["class"]
   showClose?: boolean
 }
 
-const props = withDefaults(defineProps<DialogContentExtendedProps>(), {
+const props = withDefaults(defineProps<DialogProps>(), {
   showClose: true,
 })
+
+const emit = defineEmits<{
+  "update:open": [value: boolean]
+}>()
 
 const computedClass = computed(() =>
   cn(
@@ -30,7 +35,7 @@ const computedClass = computed(() =>
 </script>
 
 <template>
-  <DialogRoot>
+  <DialogRoot :open="open" @update:open="emit('update:open', $event)">
     <DialogTrigger as-child>
       <slot name="trigger" />
     </DialogTrigger>

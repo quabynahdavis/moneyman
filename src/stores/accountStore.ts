@@ -2,6 +2,7 @@ import { defineStore } from "pinia"
 import { ref, computed } from "vue"
 import type { Account, AccountTreeNode } from "@/types"
 import { useAccountingEngine } from "@/composables/useAccountingEngine"
+import * as api from "@/services/api"
 
 export const useAccountStore = defineStore("accounts", () => {
   const accounts = ref<Account[]>([])
@@ -56,15 +57,11 @@ export const useAccountStore = defineStore("accounts", () => {
     return accounts.value.filter((a) => a.accountType === type)
   }
 
-  function setAccounts(data: Account[]) {
-    accounts.value = data
-  }
-
   function addAccount(account: Account) {
     accounts.value.push(account)
   }
 
-  function updateAccount(id: number, updates: Partial<Account>) {
+  function updateAccountInStore(id: number, updates: Partial<Account>) {
     const idx = accounts.value.findIndex((a) => a.id === id)
     if (idx !== -1) {
       accounts.value[idx] = { ...accounts.value[idx], ...updates }
@@ -73,6 +70,48 @@ export const useAccountStore = defineStore("accounts", () => {
 
   function removeAccount(id: number) {
     accounts.value = accounts.value.filter((a) => a.id !== id)
+  }
+
+  // ── API-backed actions ──
+
+  async function fetchAccounts() {
+    loading.value = true
+    error.value = null
+    try {
+      const data = await api.listAccounts()
+      accounts.value = data
+    } catch (e: any) {
+      error.value = typeof e === "string" ? e : e.message || "Failed to fetch accounts"
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function createNewAccount(payload: api.CreateAccountPayload) {
+    error.value = null
+    try {
+      const account = await api.createAccount(payload)
+      accounts.value.push(account)
+      return account
+    } catch (e: any) {
+      error.value = typeof e === "string" ? e : e.message || "Failed to create account"
+      throw error.value
+    }
+  }
+
+  async function updateExistingAccount(payload: api.UpdateAccountPayload) {
+    error.value = null
+    try {
+      const account = await api.updateAccount(payload)
+      const idx = accounts.value.findIndex((a) => a.id === account.id)
+      if (idx !== -1) {
+        accounts.value[idx] = account
+      }
+      return account
+    } catch (e: any) {
+      error.value = typeof e === "string" ? e : e.message || "Failed to update account"
+      throw error.value
+    }
   }
 
   return {
@@ -87,9 +126,11 @@ export const useAccountStore = defineStore("accounts", () => {
     getDescendantIds,
     getLeafAccounts,
     getAccountsByType,
-    setAccounts,
     addAccount,
-    updateAccount,
+    updateAccountInStore,
     removeAccount,
+    fetchAccounts,
+    createNewAccount,
+    updateExistingAccount,
   }
 })

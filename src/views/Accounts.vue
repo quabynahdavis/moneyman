@@ -1,16 +1,23 @@
 <script setup lang="ts">
-import { ref, computed } from "vue"
+import { ref, computed, onMounted } from "vue"
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "@/components/ui"
+import Dialog from "@/components/ui/Dialog.vue"
 import { useAccountStore } from "@/stores/accountStore"
 import { formatMoney, isNegative } from "@/utils/decimal"
 import { useRouter } from "vue-router"
-import { Plus, ChevronRight, ChevronDown, Circle } from "@lucide/vue"
+import { Plus, ChevronRight, ChevronDown, Circle, RefreshCw } from "@lucide/vue"
 import type { AccountTreeNode } from "@/types"
 import { ACCOUNT_TYPE_LABELS } from "@/types"
+import AccountFormDialog from "@/components/AccountFormDialog.vue"
 
 const accountStore = useAccountStore()
 const router = useRouter()
 const expanded = ref<Set<number>>(new Set())
+const showCreateDialog = ref(false)
+
+onMounted(() => {
+  accountStore.fetchAccounts()
+})
 
 function toggle(id: number) {
   const s = new Set(expanded.value)
@@ -27,8 +34,7 @@ const flatTree = computed(() => {
   const result: { node: AccountTreeNode; depth: number; visible: boolean }[] = []
   function walk(nodes: AccountTreeNode[], depth: number, parentVisible: boolean) {
     for (const n of nodes) {
-      const visible = parentVisible
-      result.push({ node: n, depth, visible })
+      result.push({ node: n, depth, visible: parentVisible })
       if (n.children.length > 0 && isOpen(n.id)) {
         walk(n.children, depth + 1, true)
       }
@@ -37,6 +43,10 @@ const flatTree = computed(() => {
   walk(accountStore.accountTree, 0, true)
   return result
 })
+
+function onAccountSaved() {
+  showCreateDialog.value = false
+}
 </script>
 
 <template>
@@ -46,10 +56,16 @@ const flatTree = computed(() => {
         <h2 class="text-lg font-semibold">Chart of Accounts</h2>
         <p class="text-sm text-muted-foreground">Manage your account hierarchy</p>
       </div>
-      <Button>
-        <Plus class="h-4 w-4 mr-2" />
-        New Account
-      </Button>
+      <div class="flex gap-2">
+        <Button variant="outline" size="sm" @click="accountStore.fetchAccounts()">
+          <RefreshCw class="h-4 w-4 mr-1" />
+          Refresh
+        </Button>
+        <Button @click="showCreateDialog = true">
+          <Plus class="h-4 w-4 mr-2" />
+          New Account
+        </Button>
+      </div>
     </div>
 
     <Card>
@@ -57,7 +73,13 @@ const flatTree = computed(() => {
         <CardTitle>Account Tree</CardTitle>
       </CardHeader>
       <CardContent class="p-0">
-        <div class="divide-y">
+        <div v-if="accountStore.loading" class="p-8 text-center text-sm text-muted-foreground">
+          Loading accounts...
+        </div>
+        <div v-else-if="accountStore.error" class="p-8 text-center text-sm text-destructive">
+          {{ accountStore.error }}
+        </div>
+        <div v-else class="divide-y">
           <div
             v-for="item in flatTree"
             :key="item.node.id"
@@ -96,5 +118,11 @@ const flatTree = computed(() => {
         </div>
       </CardContent>
     </Card>
+
+    <Dialog v-model:open="showCreateDialog">
+      <template #default>
+        <AccountFormDialog @saved="onAccountSaved" @closed="showCreateDialog = false" />
+      </template>
+    </Dialog>
   </div>
 </template>

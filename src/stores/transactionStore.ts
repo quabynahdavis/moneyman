@@ -2,6 +2,8 @@ import { defineStore } from "pinia"
 import { ref, computed } from "vue"
 import type { Transaction, RecurringTransaction } from "@/types"
 import { useAccountingEngine } from "@/composables/useAccountingEngine"
+import * as api from "@/services/api"
+import Decimal from "decimal.js"
 
 export const useTransactionStore = defineStore("transactions", () => {
   const transactions = ref<Transaction[]>([])
@@ -15,59 +17,22 @@ export const useTransactionStore = defineStore("transactions", () => {
   const filterText = ref("")
   const filterAccountId = ref<number | null>(null)
   const filterState = ref<string | null>(null)
+  const totalTransactions = ref(0)
 
   const { validateBalanced } = useAccountingEngine()
 
-  const totalTransactions = computed(() => transactions.value.length)
-
-  const filteredTransactions = computed(() => {
-    let result = [...transactions.value]
-
-    if (filterText.value) {
-      const q = filterText.value.toLowerCase()
-      result = result.filter(
-        (t) =>
-          (t.description && t.description.toLowerCase().includes(q)) ||
-          (t.payee && t.payee.toLowerCase().includes(q)) ||
-          (t.number && t.number.toLowerCase().includes(q)),
-      )
-    }
-
-    if (filterAccountId.value !== null) {
-      result = result.filter((t) =>
-        t.splits.some((s) => s.accountId === filterAccountId.value),
-      )
-    }
-
-    if (filterState.value) {
-      result = result.filter((t) => t.state === filterState.value)
-    }
-
-    result.sort((a, b) => {
-      let cmp = 0
-      if (sortField.value === "date") {
-        cmp = a.date.localeCompare(b.date)
-      } else if (sortField.value === "payee") {
-        cmp = (a.payee || "").localeCompare(b.payee || "")
-      } else if (sortField.value === "amount") {
-        cmp = computeTxnTotal(a).localeCompare(computeTxnTotal(b))
-      } else if (sortField.value === "state") {
-        cmp = a.state.localeCompare(b.state)
-      }
-      return sortDirection.value === "desc" ? -cmp : cmp
-    })
-
-    return result
-  })
-
-  const paginatedTransactions = computed(() => {
-    const start = (currentPage.value - 1) * pageSize.value
-    return filteredTransactions.value.slice(start, start + pageSize.value)
-  })
-
   const totalPages = computed(() =>
-    Math.ceil(filteredTransactions.value.length / pageSize.value),
+    Math.ceil(totalTransactions.value / pageSize.value),
   )
+
+  const paginatedTransactions = computed(() => transactions.value)
+
+  const upcomingRecurring = computed(() => {
+    const today = new Date().toISOString().split("T")[0]
+    return recurringTransactions.value
+      .filter((r) => r.isActive && r.nextDate <= today)
+      .sort((a, b) => a.nextDate.localeCompare(b.nextDate))
+  })
 
   function computeTxnTotal(txn: Transaction): string {
     return txn.splits
@@ -78,28 +43,64 @@ export const useTransactionStore = defineStore("transactions", () => {
       .toString()
   }
 
-  function addTransaction(txn: Transaction) {
-    validateBalanced(txn.splits)
-    transactions.value.unshift(txn)
-  }
+  // ── API-backed actions ──
 
-  function updateTransaction(id: number, updates: Partial<Transaction>) {
-    const idx = transactions.value.findIndex((t) => t.id === id)
-    if (idx !== -1) {
-      const updated = { ...transactions.value[idx], ...updates }
-      if (updates.splits) {
-        validateBalanced(updates.splits)
-      }
-      transactions.value[idx] = updated
+  async function fetchTransactions() {
+    loading.value = true
+    error.value = null
+    try {
+      const result = await api.listTransactions({
+        page: currentPage.value,
+        pageSize: pageSize.value,
+        sortField: sortField.value,
+        sortDirection: sortDirection.value,
+        filterText: filterText.value,
+        filterAccountId: filterAccountId.value,
+        filterState: filterState.value,
+      })
+      transactions.value = result.transactions
+      totalTransactions.value = result.total
+    } catch (e: any) {
+      error.value = typeof e === "string" ? e : e.message || "Failed to fetch transactions"
+    } finally {
+      loading.value = false
     }
   }
 
-  function removeTransaction(id: number) {
-    transactions.value = transactions.value.filter((t) => t.id !== id)
+  async function postNewTransaction(payload: api.CreateTransactionPayload) {
+    validateBalanced(
+      payload.splits.map((s) => ({
+        accountId: s.accountId,
+        debitAmount: s.debitAmount,
+        creditAmount: s.creditAmount,
+        memo: s.memo || null,
+        quantity: s.quantity || null,
+        action: s.action || null,
+        reconciledDate: null,
+      })),
+    )
+    error.value = null
+    try {
+      const txn = await api.postTransaction(payload)
+      transactions.value.unshift(txn)
+      totalTransactions.value++
+      return txn
+    } catch (e: any) {
+      error.value = typeof e === "string" ? e : e.message || "Failed to post transaction"
+      throw error.value
+    }
   }
 
-  function setTransactions(data: Transaction[]) {
-    transactions.value = data
+  async function voidExistingTransaction(id: number) {
+    error.value = null
+    try {
+      await api.voidTransaction(id)
+      transactions.value = transactions.value.filter((t) => t.id !== id)
+      totalTransactions.value = Math.max(0, totalTransactions.value - 1)
+    } catch (e: any) {
+      error.value = typeof e === "string" ? e : e.message || "Failed to void transaction"
+      throw error.value
+    }
   }
 
   function setSort(field: string) {
@@ -109,28 +110,13 @@ export const useTransactionStore = defineStore("transactions", () => {
       sortField.value = field
       sortDirection.value = "desc"
     }
+    fetchTransactions()
   }
 
   function setPage(page: number) {
     currentPage.value = page
+    fetchTransactions()
   }
-
-  function addRecurring(rt: RecurringTransaction) {
-    recurringTransactions.value.push(rt)
-  }
-
-  function removeRecurring(id: number) {
-    recurringTransactions.value = recurringTransactions.value.filter(
-      (r) => r.id !== id,
-    )
-  }
-
-  const upcomingRecurring = computed(() => {
-    const today = new Date().toISOString().split("T")[0]
-    return recurringTransactions.value
-      .filter((r) => r.isActive && r.nextDate <= today)
-      .sort((a, b) => a.nextDate.localeCompare(b.nextDate))
-  })
 
   return {
     transactions,
@@ -145,20 +131,14 @@ export const useTransactionStore = defineStore("transactions", () => {
     filterAccountId,
     filterState,
     totalTransactions,
-    filteredTransactions,
     paginatedTransactions,
     totalPages,
     upcomingRecurring,
     computeTxnTotal,
-    addTransaction,
-    updateTransaction,
-    removeTransaction,
-    setTransactions,
+    fetchTransactions,
+    postNewTransaction,
+    voidExistingTransaction,
     setSort,
     setPage,
-    addRecurring,
-    removeRecurring,
   }
 })
-
-import Decimal from "decimal.js"
