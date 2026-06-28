@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { Account, Transaction } from "@/types"
+import type { Account, AccountNode, Transaction } from "@/types"
 
 // ── Account API ──────────────────────────────────────────────────────────
 
@@ -10,7 +10,7 @@ export interface CreateAccountPayload {
   name: string
   description: string | null
   currencyCode?: string
-  placeholder?: boolean
+  isPlaceholder?: boolean
   sortOrder?: number
 }
 
@@ -22,13 +22,17 @@ export interface UpdateAccountPayload {
   name?: string
   description?: string | null
   currencyCode?: string
-  placeholder?: boolean
+  isPlaceholder?: boolean
   isActive?: boolean
   sortOrder?: number
 }
 
 export async function listAccounts(): Promise<Account[]> {
   return await invoke("list_accounts")
+}
+
+export async function getAccountTree(): Promise<AccountNode[]> {
+  return await invoke("get_account_tree")
 }
 
 export async function createAccount(payload: CreateAccountPayload): Promise<Account> {
@@ -40,7 +44,7 @@ export async function createAccount(payload: CreateAccountPayload): Promise<Acco
       name: payload.name,
       description: payload.description,
       currency_code: payload.currencyCode,
-      placeholder: payload.placeholder,
+      is_placeholder: payload.isPlaceholder,
       sort_order: payload.sortOrder,
     },
   })
@@ -56,7 +60,7 @@ export async function updateAccount(payload: UpdateAccountPayload): Promise<Acco
       name: payload.name,
       description: payload.description,
       currency_code: payload.currencyCode,
-      placeholder: payload.placeholder,
+      is_placeholder: payload.isPlaceholder,
       is_active: payload.isActive,
       sort_order: payload.sortOrder,
     },

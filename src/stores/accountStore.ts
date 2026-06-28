@@ -1,19 +1,14 @@
 import { defineStore } from "pinia"
 import { ref, computed } from "vue"
-import type { Account, AccountTreeNode } from "@/types"
-import { useAccountingEngine } from "@/composables/useAccountingEngine"
+import type { Account, AccountNode } from "@/types"
+import { Decimal, toDecimal } from "@/utils/decimal"
 import * as api from "@/services/api"
 
 export const useAccountStore = defineStore("accounts", () => {
   const accounts = ref<Account[]>([])
+  const tree = ref<AccountNode[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
-
-  const { buildAccountTree } = useAccountingEngine()
-
-  const accountTree = computed<AccountTreeNode[]>(() => {
-    return buildAccountTree(accounts.value)
-  })
 
   const activeAccounts = computed(() =>
     accounts.value.filter((a) => a.isActive),
@@ -26,6 +21,19 @@ export const useAccountStore = defineStore("accounts", () => {
     }
     return map
   })
+
+  function rollupBalances(nodes: AccountNode[]): AccountNode[] {
+    return nodes.map((node) => {
+      const children = node.children ? rollupBalances(node.children) : []
+      const childSum = children.reduce((acc, child) => {
+        return acc.plus(child.balance)
+      }, new Decimal(0))
+      const total = toDecimal(node.balance).plus(childSum)
+      return { ...node, balance: total.toString(), children }
+    })
+  }
+
+  const treeWithRollup = computed(() => rollupBalances(tree.value))
 
   function getAccountById(id: number): Account | undefined {
     return accountMap.value.get(id)
@@ -87,11 +95,24 @@ export const useAccountStore = defineStore("accounts", () => {
     }
   }
 
+  async function fetchAccountTree() {
+    loading.value = true
+    error.value = null
+    try {
+      tree.value = await api.getAccountTree()
+    } catch (e: any) {
+      error.value = typeof e === "string" ? e : e.message || "Failed to fetch account tree"
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function createNewAccount(payload: api.CreateAccountPayload) {
     error.value = null
     try {
       const account = await api.createAccount(payload)
       accounts.value.push(account)
+      await fetchAccountTree()
       return account
     } catch (e: any) {
       error.value = typeof e === "string" ? e : e.message || "Failed to create account"
@@ -107,6 +128,7 @@ export const useAccountStore = defineStore("accounts", () => {
       if (idx !== -1) {
         accounts.value[idx] = account
       }
+      await fetchAccountTree()
       return account
     } catch (e: any) {
       error.value = typeof e === "string" ? e : e.message || "Failed to update account"
@@ -116,9 +138,10 @@ export const useAccountStore = defineStore("accounts", () => {
 
   return {
     accounts,
+    tree,
     loading,
     error,
-    accountTree,
+    treeWithRollup,
     activeAccounts,
     accountMap,
     getAccountById,
@@ -130,6 +153,7 @@ export const useAccountStore = defineStore("accounts", () => {
     updateAccountInStore,
     removeAccount,
     fetchAccounts,
+    fetchAccountTree,
     createNewAccount,
     updateExistingAccount,
   }

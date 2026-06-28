@@ -9,12 +9,28 @@ pub struct Account {
     pub name: String,
     pub description: Option<String>,
     pub currency_code: String,
-    pub placeholder: bool,
+    pub is_placeholder: bool,
     pub is_active: bool,
     pub sort_order: i64,
     pub balance: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AccountNode {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub account_type: String,
+    pub code: Option<String>,
+    pub name: String,
+    pub description: Option<String>,
+    pub currency_code: String,
+    pub is_placeholder: bool,
+    pub is_active: bool,
+    pub sort_order: i64,
+    pub balance: String,
+    pub children: Vec<AccountNode>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,7 +41,7 @@ pub struct CreateAccountPayload {
     pub name: String,
     pub description: Option<String>,
     pub currency_code: Option<String>,
-    pub placeholder: Option<bool>,
+    pub is_placeholder: Option<bool>,
     pub sort_order: Option<i64>,
 }
 
@@ -38,7 +54,7 @@ pub struct UpdateAccountPayload {
     pub name: Option<String>,
     pub description: Option<Option<String>>,
     pub currency_code: Option<String>,
-    pub placeholder: Option<bool>,
+    pub is_placeholder: Option<bool>,
     pub is_active: Option<bool>,
     pub sort_order: Option<i64>,
 }

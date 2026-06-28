@@ -37,7 +37,7 @@ const saving = ref(false)
 const error = ref("")
 
 const leafAccounts = computed(() =>
-  accountStore.activeAccounts.filter((a) => !a.placeholder),
+  accountStore.activeAccounts.filter((a) => !a.isPlaceholder),
 )
 
 const totalDebits = computed(() =>

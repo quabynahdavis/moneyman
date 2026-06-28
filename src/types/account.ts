@@ -22,7 +22,7 @@ export interface Account {
   name: string
   description: string | null
   currencyCode: string
-  placeholder: boolean
+  isPlaceholder: boolean
   isActive: boolean
   sortOrder: number
   balance: string
@@ -30,9 +30,19 @@ export interface Account {
   updatedAt: string
 }
 
-export interface AccountTreeNode extends Account {
-  children: AccountTreeNode[]
-  depth: number
+export interface AccountNode {
+  id: number
+  parentId: number | null
+  accountType: AccountType
+  code: string | null
+  name: string
+  description: string | null
+  currencyCode: string
+  isPlaceholder: boolean
+  isActive: boolean
+  sortOrder: number
+  balance: string
+  children?: AccountNode[]
 }
 
 export interface AccountBalance {

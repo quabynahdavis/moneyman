@@ -1,4 +1,4 @@
-import type { Account, AccountTreeNode, Split, Transaction } from "@/types"
+import type { Account, AccountNode, Split, Transaction } from "@/types"
 import { Decimal, toDecimal } from "@/utils/decimal"
 
 export function useAccountingEngine() {
@@ -67,19 +67,19 @@ export function useAccountingEngine() {
     })
   }
 
-  function buildAccountTree(accounts: Account[]): AccountTreeNode[] {
-    const map = new Map<number, AccountTreeNode>()
-    const roots: AccountTreeNode[] = []
+  function buildAccountTree(accounts: Account[]): AccountNode[] {
+    const map = new Map<number, AccountNode>()
+    const roots: AccountNode[] = []
 
     for (const acc of accounts) {
-      map.set(acc.id, { ...acc, children: [], depth: 0 })
+      map.set(acc.id, { ...acc, children: [] })
     }
 
     for (const acc of accounts) {
       const node = map.get(acc.id)!
       if (acc.parentId !== null && map.has(acc.parentId)) {
         const parent = map.get(acc.parentId)!
-        node.depth = parent.depth + 1
+        parent.children = parent.children || []
         parent.children.push(node)
       } else {
         roots.push(node)
@@ -89,12 +89,12 @@ export function useAccountingEngine() {
     return roots
   }
 
-  function flattenAccountTree(tree: AccountTreeNode[]): Account[] {
-    const result: Account[] = []
-    function walk(nodes: AccountTreeNode[]) {
+  function flattenAccountTree(tree: AccountNode[]): AccountNode[] {
+    const result: AccountNode[] = []
+    function walk(nodes: AccountNode[]) {
       for (const node of nodes) {
         result.push(node)
-        if (node.children.length > 0) {
+        if (node.children && node.children.length > 0) {
           walk(node.children)
         }
       }

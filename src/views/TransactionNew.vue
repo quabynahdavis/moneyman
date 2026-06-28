@@ -27,7 +27,7 @@ const error = ref("")
 
 onMounted(() => accountStore.fetchAccounts())
 
-const leafAccounts = computed(() => accountStore.activeAccounts.filter((a) => !a.placeholder))
+const leafAccounts = computed(() => accountStore.activeAccounts.filter((a) => !a.isPlaceholder))
 
 const totalDebits = computed(() => splits.value.reduce((s, r) => s + (parseFloat(r.debitAmount) || 0), 0))
 const totalCredits = computed(() => splits.value.reduce((s, r) => s + (parseFloat(r.creditAmount) || 0), 0))

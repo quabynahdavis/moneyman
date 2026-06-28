@@ -18,19 +18,19 @@ const accountType = ref<AccountType>("BANK")
 const parentId = ref<number | null>(null)
 const code = ref("")
 const description = ref("")
-const placeholder = ref(false)
+const isPlaceholder = ref(false)
 const saving = ref(false)
 const error = ref("")
 
 const anchorTypes = ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"] as AccountType[]
 
 const validLeafTypes = accountStore.activeAccounts.filter(
-  (a) => !a.placeholder && !anchorTypes.includes(a.accountType as AccountType),
+  (a) => !a.isPlaceholder && !anchorTypes.includes(a.accountType as AccountType),
 )
 
 function getParentCandidates(): Account[] {
   return accountStore.activeAccounts.filter(
-    (a) => a.placeholder || anchorTypes.includes(a.accountType as AccountType),
+    (a) => a.isPlaceholder || anchorTypes.includes(a.accountType as AccountType),
   )
 }
 
@@ -48,7 +48,7 @@ async function save() {
       code: code.value || null,
       name: name.value.trim(),
       description: description.value || null,
-      placeholder: placeholder.value,
+      isPlaceholder: isPlaceholder.value,
     })
     emit("saved", account)
   } catch (e: any) {
@@ -118,7 +118,7 @@ function cancel() {
       </div>
 
       <label class="flex items-center gap-2 text-sm">
-        <input type="checkbox" v-model="placeholder" class="rounded border-input" />
+        <input type="checkbox" v-model="isPlaceholder" class="rounded border-input" />
         Placeholder (parent account, no transactions allowed)
       </label>
     </div>

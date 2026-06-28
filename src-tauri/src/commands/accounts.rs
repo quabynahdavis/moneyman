@@ -1,5 +1,5 @@
 use crate::db::Database;
-use crate::models::account::{Account, CreateAccountPayload, UpdateAccountPayload};
+use crate::models::account::{Account, AccountNode, CreateAccountPayload, UpdateAccountPayload};
 use rusqlite::params;
 use tauri::State;
 
@@ -12,7 +12,7 @@ fn row_to_account(row: &rusqlite::Row) -> rusqlite::Result<Account> {
         name: row.get("name")?,
         description: row.get("description")?,
         currency_code: row.get("currency_code")?,
-        placeholder: row.get::<_, i64>("placeholder")? != 0,
+        is_placeholder: row.get::<_, i64>("is_placeholder")? != 0,
         is_active: row.get::<_, i64>("is_active")? != 0,
         sort_order: row.get("sort_order")?,
         balance: "0".to_string(),
@@ -21,8 +21,114 @@ fn row_to_account(row: &rusqlite::Row) -> rusqlite::Result<Account> {
     })
 }
 
+fn build_tree(accounts: Vec<Account>) -> Vec<AccountNode> {
+    let mut map: std::collections::HashMap<i64, AccountNode> = std::collections::HashMap::new();
+    let mut roots = Vec::new();
+
+    for a in accounts {
+        map.insert(
+            a.id,
+            AccountNode {
+                id: a.id,
+                parent_id: a.parent_id,
+                account_type: a.account_type,
+                code: a.code,
+                name: a.name,
+                description: a.description,
+                currency_code: a.currency_code,
+                is_placeholder: a.is_placeholder,
+                is_active: a.is_active,
+                sort_order: a.sort_order,
+                balance: a.balance,
+                children: Vec::new(),
+            },
+        );
+    }
+
+    let mut sorted_ids: Vec<i64> = map.keys().copied().collect();
+    sorted_ids.sort();
+
+    for id in sorted_ids {
+        if let Some(node) = map.remove(&id) {
+            let parent_id = node.parent_id;
+            if let Some(parent_id) = parent_id {
+                if let Some(parent) = map.get_mut(&parent_id) {
+                    parent.children.push(node);
+                } else {
+                    // Parent not in map (shouldn't happen with FK constraint, but handle gracefully)
+                    roots.push(node);
+                }
+            } else {
+                roots.push(node);
+            }
+        }
+    }
+
+    roots
+}
+
+fn compute_balance_for_account(conn: &rusqlite::Connection, account_id: i64) -> Result<String, String> {
+    conn.query_row(
+        "SELECT CAST(COALESCE(SUM(
+            CAST(COALESCE(s.debit_amount, '0') AS REAL)
+            - CAST(COALESCE(s.credit_amount, '0') AS REAL)
+        ), 0) AS TEXT) FROM splits s
+        JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
+        WHERE s.account_id = ?1",
+        params![account_id],
+        |row| row.get(0),
+    )
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn list_accounts(db: State<Database>) -> Result<Vec<Account>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT a.*, COALESCE((
+                SELECT CAST(SUM(
+                    CAST(COALESCE(s.debit_amount, '0') AS REAL)
+                    - CAST(COALESCE(s.credit_amount, '0') AS REAL)
+                ) AS TEXT)
+                FROM splits s
+                JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
+                WHERE s.account_id IN (
+                    WITH RECURSIVE desc_ids AS (
+                        SELECT id FROM accounts WHERE parent_id = a.id
+                        UNION ALL
+                        SELECT acc.id FROM accounts acc JOIN desc_ids ON acc.parent_id = desc_ids.id
+                    )
+                    SELECT id FROM desc_ids
+                    UNION SELECT a.id
+                )
+            ), '0') AS balance
+            FROM accounts a
+            ORDER BY a.sort_order, a.name",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let accounts = stmt
+        .query_map([], |row| {
+            let mut acc = row_to_account(row)?;
+            acc.balance = row.get("balance")?;
+            Ok(acc)
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    Ok(accounts)
+}
+
+#[tauri::command]
+pub fn get_account_tree(db: State<Database>) -> Result<Vec<AccountNode>, String> {
+    let accounts = list_accounts_internal(&db)?;
+    Ok(build_tree(accounts))
+}
+
+fn list_accounts_internal(db: &Database) -> Result<Vec<Account>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
     let mut stmt = conn
@@ -70,7 +176,7 @@ pub fn create_account(
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
     conn.execute(
-        "INSERT INTO accounts (parent_id, account_type, code, name, description, currency_code, placeholder, sort_order)
+        "INSERT INTO accounts (parent_id, account_type, code, name, description, currency_code, is_placeholder, sort_order)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             payload.parent_id,
@@ -79,7 +185,7 @@ pub fn create_account(
             payload.name,
             payload.description,
             payload.currency_code.unwrap_or_else(|| "USD".to_string()),
-            payload.placeholder.unwrap_or(false).then(|| 1).unwrap_or(0),
+            payload.is_placeholder.unwrap_or(false).then(|| 1).unwrap_or(0),
             payload.sort_order.unwrap_or(0),
         ],
     )
@@ -93,20 +199,7 @@ pub fn create_account(
 
     stmt.query_row(params![id], |row| {
         let mut acc = row_to_account(row)?;
-        // Compute balance for this single account
-        let balance: String = conn
-            .query_row(
-                "SELECT CAST(COALESCE(SUM(
-                    CAST(COALESCE(s.debit_amount, '0') AS REAL)
-                    - CAST(COALESCE(s.credit_amount, '0') AS REAL)
-                ), 0) AS TEXT) FROM splits s
-                JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
-                WHERE s.account_id = ?1",
-                params![id],
-                |row| row.get(0),
-            )
-            .unwrap_or_else(|_| "0".to_string());
-        acc.balance = balance;
+        acc.balance = compute_balance_for_account(&conn, id).unwrap_or_else(|_| "0".to_string());
         Ok(acc)
     })
     .map_err(|e| e.to_string())
@@ -146,9 +239,9 @@ pub fn update_account(
         sets.push("currency_code = ?");
         param_values.push(Box::new(currency_code.clone()));
     }
-    if let Some(placeholder) = payload.placeholder {
-        sets.push("placeholder = ?");
-        param_values.push(Box::new(if placeholder { 1 } else { 0 }));
+    if let Some(is_placeholder) = payload.is_placeholder {
+        sets.push("is_placeholder = ?");
+        param_values.push(Box::new(if is_placeholder { 1 } else { 0 }));
     }
     if let Some(is_active) = payload.is_active {
         sets.push("is_active = ?");
@@ -187,19 +280,7 @@ pub fn update_account(
 
     stmt.query_row(params![payload.id], |row| {
         let mut acc = row_to_account(row)?;
-        let balance: String = conn
-            .query_row(
-                "SELECT CAST(COALESCE(SUM(
-                    CAST(COALESCE(s.debit_amount, '0') AS REAL)
-                    - CAST(COALESCE(s.credit_amount, '0') AS REAL)
-                ), 0) AS TEXT) FROM splits s
-                JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
-                WHERE s.account_id = ?1",
-                params![payload.id],
-                |row| row.get(0),
-            )
-            .unwrap_or_else(|_| "0".to_string());
-        acc.balance = balance;
+        acc.balance = compute_balance_for_account(&conn, payload.id).unwrap_or_else(|_| "0".to_string());
         Ok(acc)
     })
     .map_err(|e| e.to_string())
