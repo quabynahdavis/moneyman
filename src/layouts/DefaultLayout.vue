@@ -10,21 +10,57 @@ import {
   FileText,
   Users,
   PiggyBank,
+  Settings,
   Menu,
   Sun,
   Moon,
   Search,
   ArrowLeft,
   ArrowRight,
+  RefreshCw,
 } from "@lucide/vue"
-import { computed } from "vue"
+import { ref, computed, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
 
 const ui = useUiStore()
 const router = useRouter()
 const route = useRoute()
 
-const canGoBack = computed(() => window.history.length > 1)
+// Custom navigation stack (not browser history)
+const navStack = ref<string[]>([])
+const navIndex = ref(-1)
+
+watch(
+  () => route.fullPath,
+  (to, from) => {
+    if (from && to !== from) {
+      // Trim any forward entries if we navigated after going back
+      if (navIndex.value < navStack.value.length - 1) {
+        navStack.value = navStack.value.slice(0, navIndex.value + 1)
+      }
+      navStack.value.push(to)
+      navIndex.value = navStack.value.length - 1
+    }
+  },
+  { immediate: true },
+)
+
+const canGoBack = computed(() => navIndex.value > 0)
+const canGoForward = computed(() => navIndex.value < navStack.value.length - 1)
+
+function goBack() {
+  if (canGoBack.value) {
+    navIndex.value--
+    router.replace(navStack.value[navIndex.value])
+  }
+}
+
+function goForward() {
+  if (canGoForward.value) {
+    navIndex.value++
+    router.replace(navStack.value[navIndex.value])
+  }
+}
 
 const navItems = [
   { name: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -36,12 +72,26 @@ const navItems = [
   { name: "contacts", label: "Contacts", icon: Users },
   { name: "budgets", label: "Budgets", icon: PiggyBank },
   { name: "reports", label: "Reports", icon: BarChart3 },
+  { name: "settings", label: "Settings", icon: Settings },
 ]
 
 const sidebarWidth = computed(() => (ui.sidebarCollapsed ? "w-16" : "w-56"))
 
 function toggleTheme() {
   ui.setTheme(ui.isDark ? "light" : "dark")
+}
+
+// Route-specific refresh handlers
+function refreshCurrentPage() {
+  const name = route.name as string
+  if (name === "accounts") {
+    import("@/stores/accountStore").then((m) => m.useAccountStore().fetchAccountTree())
+  } else if (name === "dashboard") {
+    // Dashboard refreshes on mount, just re-mount by toggling key
+    window.location.reload()
+  } else if (name === "ledger" || name === "account-ledger") {
+    import("@/stores/transactionStore").then((m) => m.useTransactionStore().fetchTransactions())
+  }
 }
 </script>
 
@@ -106,19 +156,27 @@ function toggleTheme() {
         <button
           class="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-30"
           :disabled="!canGoBack"
-          @click="router.back()"
+          @click="goBack"
         >
           <ArrowLeft class="h-4 w-4" />
         </button>
         <button
-          class="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          @click="router.forward()"
+          class="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-30"
+          :disabled="!canGoForward"
+          @click="goForward"
         >
           <ArrowRight class="h-4 w-4" />
         </button>
         <h1 class="text-lg font-semibold ml-1">
           {{ route.meta.title || "Moneyman" }}
         </h1>
+        <button
+          class="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground ml-0.5"
+          @click="refreshCurrentPage"
+          title="Refresh"
+        >
+          <RefreshCw class="h-4 w-4" />
+        </button>
         <div class="ml-auto flex items-center gap-2">
           <div class="relative">
             <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
