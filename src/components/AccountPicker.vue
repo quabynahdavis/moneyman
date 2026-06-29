@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue"
-import { Check, ChevronsUpDown, ChevronLeft, Folder, SearchIcon } from "@lucide/vue"
+import { Check, ChevronsUpDown, ChevronLeft, ChevronRight, Folder, SearchIcon } from "@lucide/vue"
 import { Button } from "@/components/ui"
 import {
   Command,
@@ -24,10 +24,12 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   searchPlaceholder?: string
   emptyText?: string
+  selectPlaceholders?: boolean
 }>(), {
   placeholder: "Select account...",
   searchPlaceholder: "Search accounts...",
   emptyText: "No matching accounts",
+  selectPlaceholders: false,
 })
 
 const emit = defineEmits<{
@@ -50,7 +52,7 @@ const topLevelGroups = computed(() => {
       children: accountStore.activeAccounts.filter(
         (child) =>
           child.parentId === parent.id &&
-          (!child.isPlaceholder || hasChildren(child.id)),
+          (!child.isPlaceholder || hasChildren(child.id) || props.selectPlaceholders),
       ),
     }))
     .filter((g) => g.children.length > 0)
@@ -64,7 +66,7 @@ function getTabItems(tabParentId: number): Account[] {
   const drillId = getDrillParentId(tabParentId)
   if (drillId) {
     return accountStore.activeAccounts.filter(
-      (a) => a.parentId === drillId && (!a.isPlaceholder || hasChildren(a.id)),
+      (a) => a.parentId === drillId && (!a.isPlaceholder || hasChildren(a.id) || props.selectPlaceholders),
     )
   }
   const group = topLevelGroups.value.find((g) => g.parent.id === tabParentId)
@@ -82,7 +84,7 @@ function hasChildren(accountId: number): boolean {
 }
 
 function handleAccountClick(account: Account, tabParentId: number) {
-  if (hasChildren(account.id)) {
+  if (!props.selectPlaceholders && hasChildren(account.id)) {
     drillState.value = { ...drillState.value, [tabParentId]: account.id }
   } else {
     selectAccount(account.id.toString())
@@ -93,6 +95,14 @@ function drillBack(tabParentId: number) {
   const next = { ...drillState.value }
   delete next[tabParentId]
   drillState.value = next
+}
+
+function isSelected(account: Account): boolean {
+  return props.modelValue === String(account.id)
+}
+
+function canSelect(account: Account): boolean {
+  return props.selectPlaceholders || !hasChildren(account.id)
 }
 
 function selectAccount(id: string) {
@@ -134,7 +144,7 @@ const searchResults = computed(() => {
   const q = searchQuery.value.toLowerCase().trim()
   if (!q) return []
   return accountStore.activeAccounts.filter((a) => {
-    if (a.isPlaceholder && !hasChildren(a.id)) return false
+    if (a.isPlaceholder && !hasChildren(a.id) && !props.selectPlaceholders) return false
     return (
       a.name.toLowerCase().includes(q) ||
       (a.code && a.code.toLowerCase().includes(q)) ||
@@ -144,7 +154,7 @@ const searchResults = computed(() => {
 })
 
 function selectFromSearch(account: Account) {
-  if (hasChildren(account.id)) {
+  if (!props.selectPlaceholders && hasChildren(account.id)) {
     searchQuery.value = ""
     const group = topLevelGroups.value.find((g) => g.parent.id === account.parentId)
     if (group) {
@@ -240,11 +250,12 @@ function selectFromSearch(account: Account) {
                   class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors"
                   @click="selectFromSearch(account)"
                 >
-                  <Folder v-if="hasChildren(account.id)" class="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <Folder v-if="hasChildren(account.id) && !canSelect(account)" class="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span class="truncate">{{ account.name }}</span>
                   <span class="ml-auto text-xs text-muted-foreground shrink-0">{{ account.accountType.replace(/_/g, " ") }}</span>
+                  <ChevronRight v-if="hasChildren(account.id) && canSelect(account)" class="ml-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                   <Check
-                    v-if="modelValue === String(account.id) && !hasChildren(account.id)"
+                    v-if="isSelected(account) && canSelect(account)"
                     class="ml-1 h-4 w-4 shrink-0"
                   />
                 </button>
@@ -254,7 +265,7 @@ function selectFromSearch(account: Account) {
             <!-- Tab content -->
             <template v-else-if="selectedTab">
               <!-- Drill breadcrumb -->
-              <div v-if="getDrillParentId(Number(selectedTab))" class="flex items-center gap-1 px-2 py-1 mb-1 border-b">
+              <div v-if="!props.selectPlaceholders && getDrillParentId(Number(selectedTab))" class="flex items-center gap-1 px-2 py-1 mb-1 border-b">
                 <button
                   class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
                   @click="drillBack(Number(selectedTab))"
@@ -272,15 +283,16 @@ function selectFromSearch(account: Account) {
                 <button
                   v-for="account in getTabItems(Number(selectedTab))"
                   :key="account.id"
-                  :data-selected="modelValue === String(account.id) && !hasChildren(account.id)"
+                  :data-selected="isSelected(account) && canSelect(account)"
                   class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted data-[selected=true]:bg-muted transition-colors"
                   @click="handleAccountClick(account, Number(selectedTab))"
                 >
-                  <Folder v-if="hasChildren(account.id)" class="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <Folder v-if="hasChildren(account.id) && !canSelect(account)" class="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span class="truncate">{{ account.name }}</span>
                   <span class="ml-auto text-xs text-muted-foreground shrink-0">{{ account.accountType.replace(/_/g, " ") }}</span>
+                  <ChevronRight v-if="hasChildren(account.id) && canSelect(account)" class="ml-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                   <Check
-                    v-if="modelValue === String(account.id) && !hasChildren(account.id)"
+                    v-if="isSelected(account) && canSelect(account)"
                     class="ml-1 h-4 w-4 shrink-0"
                   />
                 </button>

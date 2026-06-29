@@ -7,6 +7,7 @@ import { ACCOUNT_TYPE_LABELS } from "@/types"
 import type { AccountType } from "@/types"
 import { toast } from "vue-sonner"
 import Combobox from "@/components/Combobox.vue"
+import AccountPicker from "@/components/AccountPicker.vue"
 
 const router = useRouter()
 const route = useRoute()
@@ -26,8 +27,6 @@ const isPlaceholder = ref(false)
 const saving = ref(false)
 const loading = ref(false)
 const error = ref("")
-
-const anchorTypes = ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"] as AccountType[]
 
 const isEditing = computed(() => editId.value !== null)
 
@@ -53,12 +52,6 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-function getParentCandidates() {
-  return accountStore.activeAccounts.filter(
-    (a) => a.isPlaceholder || anchorTypes.includes(a.accountType as AccountType),
-  )
-}
 
 async function save() {
   if (!name.value.trim()) {
@@ -117,13 +110,10 @@ async function save() {
       </div>
 
       <div class="space-y-1">
-        <Label>Parent Account</Label>
-        <Combobox
+        <Label>Parent Account <span class="text-xs text-muted-foreground">(leave empty for Root level)</span></Label>
+        <AccountPicker
           :model-value="parentId?.toString() ?? ''"
-          :items="[
-            { value: '', label: 'None (Root level)' },
-            ...getParentCandidates().map(p => ({ value: p.id.toString(), label: `${p.name} (${p.accountType})` })),
-          ]"
+          select-placeholders
           placeholder="Select parent..."
           @update:model-value="parentId = $event ? Number($event) : null"
         />
