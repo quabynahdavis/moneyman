@@ -269,3 +269,35 @@ pub fn update_account(
     })
     .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn delete_account(db: State<Database>, id: i64) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    let child_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM accounts WHERE parent_id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if child_count > 0 {
+        return Err("Account has sub-accounts. Delete them first.".to_string());
+    }
+
+    let split_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM splits WHERE account_id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if split_count > 0 {
+        return Err("Account has transactions. Void or reassign them first.".to_string());
+    }
+
+    conn.execute("DELETE FROM accounts WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}

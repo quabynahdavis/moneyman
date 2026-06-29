@@ -125,6 +125,17 @@ export const useAccountStore = defineStore("accounts", () => {
     }
   }
 
+  async function deleteExistingAccount(id: number) {
+    error.value = null
+    try {
+      await api.deleteAccount(id)
+      accounts.value = accounts.value.filter((a) => a.id !== id)
+    } catch (e: any) {
+      error.value = typeof e === "string" ? e : e.message || "Failed to delete account"
+      throw error.value
+    }
+  }
+
   return {
     accounts,
     loading,
@@ -143,5 +154,6 @@ export const useAccountStore = defineStore("accounts", () => {
     fetchAccounts,
     createNewAccount,
     updateExistingAccount,
+    deleteExistingAccount,
   }
 })

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { Account, AccountNode, Transaction } from "@/types"
+import type { Account, AccountNode, Split, Transaction } from "@/types"
 
 // ── Account API ──────────────────────────────────────────────────────────
 
@@ -27,16 +27,53 @@ export interface UpdateAccountPayload {
   sortOrder?: number
 }
 
+function toCamelAccount(raw: any): Account {
+  return {
+    id: raw.id,
+    parentId: raw.parent_id,
+    accountType: raw.account_type,
+    code: raw.code,
+    name: raw.name,
+    description: raw.description,
+    currencyCode: raw.currency_code,
+    isPlaceholder: raw.is_placeholder,
+    isActive: raw.is_active,
+    sortOrder: raw.sort_order,
+    balance: raw.balance,
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at,
+  }
+}
+
 export async function listAccounts(): Promise<Account[]> {
-  return await invoke("list_accounts")
+  const raw: any[] = await invoke("list_accounts")
+  return raw.map(toCamelAccount)
+}
+
+function toCamelAccountNode(raw: any): AccountNode {
+  return {
+    id: raw.id,
+    parentId: raw.parent_id,
+    accountType: raw.account_type,
+    code: raw.code,
+    name: raw.name,
+    description: raw.description,
+    currencyCode: raw.currency_code,
+    isPlaceholder: raw.is_placeholder,
+    isActive: raw.is_active,
+    sortOrder: raw.sort_order,
+    balance: raw.balance,
+    children: raw.children?.map(toCamelAccountNode),
+  }
 }
 
 export async function getAccountTree(): Promise<AccountNode[]> {
-  return await invoke("get_account_tree")
+  const raw: any[] = await invoke("get_account_tree")
+  return raw.map(toCamelAccountNode)
 }
 
 export async function createAccount(payload: CreateAccountPayload): Promise<Account> {
-  return await invoke("create_account", {
+  const raw: any = await invoke("create_account", {
     payload: {
       parent_id: payload.parentId,
       account_type: payload.accountType,
@@ -48,10 +85,11 @@ export async function createAccount(payload: CreateAccountPayload): Promise<Acco
       sort_order: payload.sortOrder,
     },
   })
+  return toCamelAccount(raw)
 }
 
 export async function updateAccount(payload: UpdateAccountPayload): Promise<Account> {
-  return await invoke("update_account", {
+  const raw: any = await invoke("update_account", {
     payload: {
       id: payload.id,
       parent_id: payload.parentId,
@@ -65,6 +103,11 @@ export async function updateAccount(payload: UpdateAccountPayload): Promise<Acco
       sort_order: payload.sortOrder,
     },
   })
+  return toCamelAccount(raw)
+}
+
+export async function deleteAccount(id: number): Promise<void> {
+  await invoke("delete_account", { id })
 }
 
 // ── Transaction API ──────────────────────────────────────────────────────
@@ -107,8 +150,41 @@ export interface PaginatedTransactions {
   pageSize: number
 }
 
+function toCamelSplit(raw: any): Split {
+  return {
+    id: raw.id,
+    transactionId: raw.transaction_id,
+    accountId: raw.account_id,
+    accountName: raw.account_name,
+    accountType: raw.account_type,
+    debitAmount: raw.debit_amount,
+    creditAmount: raw.credit_amount,
+    memo: raw.memo ?? null,
+    quantity: raw.quantity ?? null,
+    action: raw.action ?? null,
+    reconciledDate: raw.reconciled_date ?? null,
+  }
+}
+
+function toCamelTransaction(raw: any): Transaction {
+  return {
+    id: raw.id,
+    currencyCode: raw.currency_code,
+    description: raw.description ?? null,
+    notes: raw.notes ?? null,
+    payee: raw.payee ?? null,
+    number: raw.number ?? null,
+    date: raw.date,
+    datePosted: raw.date_posted,
+    state: raw.state,
+    splits: (raw.splits ?? []).map(toCamelSplit),
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at,
+  }
+}
+
 export async function postTransaction(payload: CreateTransactionPayload): Promise<Transaction> {
-  return await invoke("post_transaction", {
+  const raw: any = await invoke("post_transaction", {
     payload: {
       currency_code: payload.currencyCode,
       description: payload.description,
@@ -128,12 +204,13 @@ export async function postTransaction(payload: CreateTransactionPayload): Promis
       })),
     },
   })
+  return toCamelTransaction(raw)
 }
 
 export async function listTransactions(
   query: ListTransactionsQuery = {},
 ): Promise<PaginatedTransactions> {
-  return await invoke("list_transactions", {
+  const raw: any = await invoke("list_transactions", {
     query: {
       page: query.page,
       page_size: query.pageSize,
@@ -144,6 +221,12 @@ export async function listTransactions(
       filter_state: query.filterState,
     },
   })
+  return {
+    transactions: (raw.transactions ?? []).map(toCamelTransaction),
+    total: raw.total,
+    page: raw.page,
+    pageSize: raw.page_size,
+  }
 }
 
 export async function voidTransaction(id: number): Promise<void> {

@@ -19,6 +19,20 @@ function onSelect(node: AccountNode) {
     router.push({ name: "account-ledger", params: { accountId: node.id } })
   }
 }
+
+function onEdit(node: AccountNode) {
+  router.push({ name: "account-new", query: { editId: node.id } })
+}
+
+async function onDelete(node: AccountNode) {
+  const confirmed = confirm(`Delete account "${node.name}"? This cannot be undone.`)
+  if (!confirmed) return
+  try {
+    await accountStore.deleteExistingAccount(node.id)
+  } catch (e: any) {
+    alert(typeof e === "string" ? e : "Failed to delete account")
+  }
+}
 </script>
 
 <template>
@@ -47,6 +61,8 @@ function onSelect(node: AccountNode) {
           v-else
           :accounts="accountStore.treeWithRollup"
           @select-account="onSelect"
+          @edit-account="onEdit"
+          @delete-account="onDelete"
         />
       </CardContent>
     </Card>
