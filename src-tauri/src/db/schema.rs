@@ -94,6 +94,7 @@ pub const INSERT_SEED_DATA: &[&str] = &[
     "INSERT OR IGNORE INTO transaction_states (id, name) VALUES ('RECONCILED', 'Reconciled')",
     "INSERT OR IGNORE INTO transaction_states (id, name) VALUES ('VOID', 'Void')",
     // Currencies
+    "INSERT OR IGNORE INTO currencies (code, name, symbol, decimal_places) VALUES ('GHC', 'Ghana Cedi', '₵', 2)",
     "INSERT OR IGNORE INTO currencies (code, name, symbol, decimal_places) VALUES ('USD', 'US Dollar', '$', 2)",
     "INSERT OR IGNORE INTO currencies (code, name, symbol, decimal_places) VALUES ('EUR', 'Euro', '€', 2)",
     "INSERT OR IGNORE INTO currencies (code, name, symbol, decimal_places) VALUES ('GBP', 'British Pound', '£', 2)",

@@ -60,7 +60,7 @@ INSERT INTO recurring_frequencies (id, name) VALUES
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE currencies (
-    code        TEXT PRIMARY KEY,          -- ISO 4217: USD, EUR, GBP, JPY...
+    code        TEXT PRIMARY KEY,          -- ISO 4217: GHC, EUR, GBP, JPY...
     name        TEXT NOT NULL,
     symbol      TEXT NOT NULL,
     decimal_places INTEGER NOT NULL DEFAULT 2
@@ -87,7 +87,7 @@ CREATE TABLE accounts (
     code            TEXT,                   -- Optional account number (e.g. "1000")
     name            TEXT NOT NULL,
     description     TEXT,
-    currency_code   TEXT NOT NULL DEFAULT 'USD' REFERENCES currencies(code),
+    currency_code   TEXT NOT NULL DEFAULT 'GHC' REFERENCES currencies(code),
     placeholder     INTEGER NOT NULL DEFAULT 0,  -- 1 = parent-only (no txns allowed)
     is_active       INTEGER NOT NULL DEFAULT 1,
     sort_order      INTEGER NOT NULL DEFAULT 0,
@@ -104,7 +104,7 @@ CREATE INDEX idx_accounts_type ON accounts(account_type);
 
 CREATE TABLE transactions (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    currency_code   TEXT NOT NULL DEFAULT 'USD' REFERENCES currencies(code),
+    currency_code   TEXT NOT NULL DEFAULT 'GHC' REFERENCES currencies(code),
     description     TEXT,
     notes           TEXT,
     payee           TEXT,                   -- For checkbook-style register
@@ -201,7 +201,7 @@ CREATE TABLE contacts (
     country         TEXT,
     tax_id          TEXT,
     default_terms   INTEGER DEFAULT 30,       -- Net 30, Net 60, etc.
-    currency_code   TEXT DEFAULT 'USD' REFERENCES currencies(code),
+    currency_code   TEXT DEFAULT 'GHC' REFERENCES currencies(code),
     notes           TEXT,
     is_active       INTEGER NOT NULL DEFAULT 1,
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
@@ -220,7 +220,7 @@ CREATE TABLE invoices (
     invoice_type    TEXT NOT NULL CHECK(invoice_type IN ('INVOICE', 'BILL')),
     invoice_number  TEXT NOT NULL,
     contact_id      INTEGER NOT NULL REFERENCES contacts(id),
-    currency_code   TEXT NOT NULL DEFAULT 'USD' REFERENCES currencies(code),
+    currency_code   TEXT NOT NULL DEFAULT 'GHC' REFERENCES currencies(code),
     issue_date      DATE NOT NULL DEFAULT (date('now')),
     due_date        DATE NOT NULL,
     payment_terms   INTEGER DEFAULT 30,
@@ -303,7 +303,7 @@ CREATE TABLE price_quotes (
     date            DATE NOT NULL DEFAULT (date('now')),
     price           TEXT NOT NULL,         -- DECIMAL: price per share/unit
     source          TEXT DEFAULT 'manual', -- 'manual', 'yahoo', 'alpha_vantage'
-    currency_code   TEXT NOT NULL DEFAULT 'USD',
+    currency_code   TEXT NOT NULL DEFAULT 'GHC',
     UNIQUE(account_id, date)
 );
 
