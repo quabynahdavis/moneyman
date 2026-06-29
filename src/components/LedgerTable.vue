@@ -176,58 +176,56 @@ const dropdownItemClass = "relative flex cursor-default items-center gap-2 round
           <template v-for="row in ledgerRows" :key="row.id">
             <ContextMenu>
               <ContextMenuTrigger as-child>
-                <div>
-                  <TableRow
-                    class="cursor-pointer hover:bg-muted/50"
-                    :class="{ 'bg-muted/30': isExpanded(row.txnId) }"
-                    @click="toggleExpand(row.txnId)"
-                  >
-                    <TableCell class="py-1.5">
-                      <component
-                        :is="isExpanded(row.txnId) ? ChevronDown : ChevronRight"
-                        class="h-4 w-4 text-muted-foreground"
-                      />
-                    </TableCell>
-                    <TableCell class="py-1.5 whitespace-nowrap font-mono text-xs">{{ row.postDate }}</TableCell>
-                    <TableCell class="py-1.5 whitespace-nowrap font-mono text-xs text-muted-foreground">{{ row.num || "" }}</TableCell>
-                    <TableCell class="py-1.5 text-sm font-medium">{{ row.description }}</TableCell>
-                    <TableCell class="py-1.5 text-sm text-muted-foreground">{{ row.transferAccount }}</TableCell>
-                    <TableCell class="py-1.5 text-right font-mono text-sm tabular-nums">{{ row.debit ? formatCents(row.debit) : "" }}</TableCell>
-                    <TableCell class="py-1.5 text-right font-mono text-sm tabular-nums">{{ row.credit ? formatCents(row.credit) : "" }}</TableCell>
-                    <TableCell class="py-1.5 text-right font-mono text-sm tabular-nums font-medium">{{ formatCents(row.balance) }}</TableCell>
-                    <TableCell class="py-1.5">
-                      <span
-                        v-if="row.state !== 'UNRECONCILED'"
-                        class="inline-block w-5 text-center text-xs rounded"
-                        :class="stateBadge(row.state)"
-                      >{{ row.state === "RECONCILED" ? "R" : row.state === "CLEARED" ? "C" : "V" }}</span>
-                    </TableCell>
-                    <TableCell class="py-1.5" @click.stop>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger as-child>
-                          <div
-                            class="h-7 w-7 opacity-0 group-hover/row:opacity-100 shrink-0 flex items-center justify-center rounded-md hover:bg-muted transition-colors cursor-pointer"
-                            @click.stop
-                          >⋮</div>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuPortal>
-                          <DropdownMenuContent :align="'end'" class="min-w-[120px] rounded-md border bg-popover p-1 shadow-md">
-                            <DropdownMenuItem :class="dropdownItemClass" @select="emit('edit-transaction', row.txnId)">
-                              <Pencil class="h-4 w-4" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              v-if="row.state !== 'VOID'"
-                              :class="dropdownItemClass"
-                              @select="emit('void-transaction', row.txnId)"
-                            >
-                              <EyeOff class="h-4 w-4" /> Void
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenuPortal>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                </div>
+                <TableRow
+                  class="cursor-pointer hover:bg-muted/50"
+                  :class="{ 'bg-muted/30': isExpanded(row.txnId) }"
+                  @click="toggleExpand(row.txnId)"
+                >
+                  <TableCell class="py-1.5">
+                    <component
+                      :is="isExpanded(row.txnId) ? ChevronDown : ChevronRight"
+                      class="h-4 w-4 text-muted-foreground"
+                    />
+                  </TableCell>
+                  <TableCell class="py-1.5 whitespace-nowrap font-mono text-xs">{{ row.postDate }}</TableCell>
+                  <TableCell class="py-1.5 whitespace-nowrap font-mono text-xs text-muted-foreground">{{ row.num || "" }}</TableCell>
+                  <TableCell class="py-1.5 text-sm font-medium">{{ row.description }}</TableCell>
+                  <TableCell class="py-1.5 text-sm text-muted-foreground">{{ row.transferAccount }}</TableCell>
+                  <TableCell class="py-1.5 text-right font-mono text-sm tabular-nums">{{ row.debit ? formatCents(row.debit) : "" }}</TableCell>
+                  <TableCell class="py-1.5 text-right font-mono text-sm tabular-nums">{{ row.credit ? formatCents(row.credit) : "" }}</TableCell>
+                  <TableCell class="py-1.5 text-right font-mono text-sm tabular-nums font-medium">{{ formatCents(row.balance) }}</TableCell>
+                  <TableCell class="py-1.5">
+                    <span
+                      v-if="row.state !== 'UNRECONCILED'"
+                      class="inline-block w-5 text-center text-xs rounded"
+                      :class="stateBadge(row.state)"
+                    >{{ row.state === "RECONCILED" ? "R" : row.state === "CLEARED" ? "C" : "V" }}</span>
+                  </TableCell>
+                  <TableCell class="py-1.5" @click.stop>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger as-child>
+                        <div
+                          class="h-7 w-7 opacity-0 group-hover/row:opacity-100 shrink-0 flex items-center justify-center rounded-md hover:bg-muted transition-colors cursor-pointer"
+                          @click.stop
+                        >⋮</div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuContent :align="'end'" class="min-w-[120px] rounded-md border bg-popover p-1 shadow-md">
+                          <DropdownMenuItem :class="dropdownItemClass" @select="emit('edit-transaction', row.txnId)">
+                            <Pencil class="h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            v-if="row.state !== 'VOID'"
+                            :class="dropdownItemClass"
+                            @select="emit('void-transaction', row.txnId)"
+                          >
+                            <EyeOff class="h-4 w-4" /> Void
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
               </ContextMenuTrigger>
               <ContextMenuPortal>
                 <ContextMenuContent class="min-w-[120px] rounded-md border bg-popover p-1 shadow-md">
