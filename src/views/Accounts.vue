@@ -45,8 +45,8 @@ function onSelect(node: AccountNode) {
         <div v-else-if="accountStore.error" class="p-8 text-center text-sm text-destructive">{{ accountStore.error }}</div>
         <AccountTree
           v-else
-          :nodes="accountStore.treeWithRollup"
-          @select="onSelect"
+          :accounts="accountStore.treeWithRollup"
+          @select-account="onSelect"
         />
       </CardContent>
     </Card>

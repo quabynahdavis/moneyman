@@ -1,90 +1,84 @@
 <script setup lang="ts">
-import { ref } from "vue"
-import { ChevronRight } from "@lucide/vue"
-import { Badge, Button, Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import { Folder, FileText } from "@lucide/vue"
+import { Badge, Button } from "@/components/ui"
 import { formatMoney, isNegative } from "@/utils/decimal"
 import { ACCOUNT_TYPE_LABELS } from "@/types"
 import type { AccountNode } from "@/types"
 
 defineOptions({ name: "AccountTree" })
 
-const props = withDefaults(
-  defineProps<{
-    nodes: AccountNode[]
-    depth?: number
-  }>(),
-  { depth: 0 },
-)
-
-const emit = defineEmits<{
-  select: [node: AccountNode]
+defineProps<{
+  accounts: AccountNode[]
 }>()
 
-const openItems = ref<string[]>([])
+const emit = defineEmits<{
+  (e: "select-account", account: AccountNode): void
+}>()
 </script>
 
 <template>
-  <Accordion type="multiple" v-model="openItems" class="w-full">
-    <template v-for="node in nodes" :key="node.id">
+  <Accordion type="multiple" class="w-full">
+    <template v-for="account in accounts" :key="account.id">
       <AccordionItem
-        v-if="node.children && node.children.length > 0"
-        :value="String(node.id)"
-        class="border-b last:border-b-0"
+        v-if="account.children && account.children.length > 0"
+        :value="account.id.toString()"
+        class="border-b-0"
       >
         <AccordionTrigger
-          :class="'flex items-center gap-1.5 px-4 py-2 hover:bg-muted/50 hover:no-underline text-sm group w-full [&[data-state=open]>[data-chevron]]:rotate-90' + (node.isPlaceholder ? ' opacity-60 italic' : '')"
-          :style="{ paddingLeft: `${depth * 24 + 16}px` }"
+          class="py-2 hover:no-underline hover:bg-muted/50 px-2 rounded-md transition-colors items-center"
+          :class="{ 'opacity-60 italic': account.isPlaceholder }"
         >
-          <ChevronRight
-            data-chevron
-            class="h-4 w-4 text-muted-foreground transition-transform duration-150 shrink-0"
-          />
-
-          <span v-if="node.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ node.code }}</span>
-          <span class="flex-1 font-medium truncate text-left">{{ node.name }}</span>
-          <Badge variant="secondary" class="text-xs shrink-0 ml-1">{{ ACCOUNT_TYPE_LABELS[node.accountType] }}</Badge>
-          <span
-            class="font-mono tabular-nums text-right w-28 shrink-0"
-            :class="isNegative(node.balance) ? 'text-rose-500' : ''"
-          >{{ formatMoney(node.balance) }}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0 font-medium"
-            @click.stop="emit('select', node)"
-          >View</Button>
-
-          <template #icon></template>
+          <div class="flex items-center gap-2 text-sm flex-1 min-w-0">
+            <Folder class="h-4 w-4 text-muted-foreground shrink-0" />
+            <span v-if="account.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ account.code }}</span>
+            <span class="font-medium truncate">{{ account.name }}</span>
+            <Badge variant="secondary" class="text-xs shrink-0 ml-auto">{{ ACCOUNT_TYPE_LABELS[account.accountType] }}</Badge>
+            <span
+              class="font-mono tabular-nums text-right w-28 shrink-0"
+              :class="isNegative(account.balance) ? 'text-rose-500' : ''"
+            >{{ formatMoney(account.balance) }}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-7 px-2 opacity-0 group-hover/accordion-trigger:opacity-100 shrink-0 font-medium"
+              @click.stop="emit('select-account', account)"
+            >View</Button>
+          </div>
         </AccordionTrigger>
 
-        <AccordionContent>
+        <AccordionContent class="pb-0 pl-4 border-l ml-4 mt-1">
           <AccountTree
-            :nodes="node.children"
-            :depth="depth + 1"
-            @select="emit('select', $event)"
+            :accounts="account.children"
+            @select-account="(a: AccountNode) => emit('select-account', a)"
           />
         </AccordionContent>
       </AccordionItem>
 
       <div
         v-else
-        class="flex items-center gap-1.5 px-4 py-2 hover:bg-muted/50 select-none text-sm border-b last:border-b-0 group"
-        :class="node.isPlaceholder ? 'opacity-60 italic' : ''"
-        :style="{ paddingLeft: `${depth * 24 + 16}px` }"
+        @click="emit('select-account', account)"
+        class="flex items-center gap-2 py-2 px-2 text-sm hover:bg-muted/50 rounded-md cursor-pointer transition-colors group"
+        :class="{ 'opacity-60 italic': account.isPlaceholder }"
       >
-        <div class="w-4 h-4 shrink-0" />
-        <span v-if="node.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ node.code }}</span>
-        <span class="flex-1 font-medium truncate">{{ node.name }}</span>
-        <Badge variant="secondary" class="text-xs shrink-0 ml-1">{{ ACCOUNT_TYPE_LABELS[node.accountType] }}</Badge>
+        <FileText class="h-4 w-4 text-primary shrink-0" />
+        <span v-if="account.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ account.code }}</span>
+        <span class="font-medium truncate flex-1">{{ account.name }}</span>
+        <Badge variant="secondary" class="text-xs shrink-0">{{ ACCOUNT_TYPE_LABELS[account.accountType] }}</Badge>
         <span
           class="font-mono tabular-nums text-right w-28 shrink-0"
-          :class="isNegative(node.balance) ? 'text-rose-500' : ''"
-        >{{ formatMoney(node.balance) }}</span>
+          :class="isNegative(account.balance) ? 'text-rose-500' : ''"
+        >{{ formatMoney(account.balance) }}</span>
         <Button
           variant="ghost"
           size="sm"
-          class="h-7 px-2 opacity-0 hover:opacity-100 shrink-0 font-medium"
-          @click.stop="emit('select', node)"
+          class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0 font-medium"
+          @click.stop="emit('select-account', account)"
         >View</Button>
       </div>
     </template>
