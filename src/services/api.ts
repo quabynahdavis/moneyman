@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { Account, AccountNode, Split, Transaction, ReconciliationData, ImportPreviewItem, CommitImportResult, ImportProfile } from "@/types"
+import type { Account, AccountNode, Split, Transaction, ReconciliationData, ImportPreviewItem, CommitImportResult, ImportProfile, RecurringTransaction, RecurringSplit } from "@/types"
 
 // ── Account API ──────────────────────────────────────────────────────────
 
@@ -420,4 +420,135 @@ export async function commitImport(payload: {
     },
   })
   return { imported: raw.imported, skipped: raw.skipped }
+}
+
+// ── Recurring Transactions API ──────────────────────────────────────────
+
+function toCamelRecurringSplit(raw: any): RecurringSplit {
+  return {
+    id: raw.id,
+    recurringId: raw.recurring_id,
+    accountId: raw.account_id,
+    debit: raw.debit,
+    credit: raw.credit,
+    memo: raw.memo ?? null,
+  }
+}
+
+function toCamelRecurringTransaction(raw: any): RecurringTransaction {
+  return {
+    id: raw.id,
+    frequency: raw.frequency,
+    intervalCount: raw.interval_count,
+    nextDate: raw.next_date,
+    endDate: raw.end_date ?? null,
+    autoExecute: raw.auto_execute,
+    lastGenerated: raw.last_generated ?? null,
+    isActive: raw.is_active,
+    description: raw.description ?? "",
+    currencyCode: raw.currency_code ?? "USD",
+    notes: raw.notes ?? null,
+    num: raw.num ?? null,
+    splits: (raw.splits ?? []).map(toCamelRecurringSplit),
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at,
+  }
+}
+
+export async function listRecurringTransactions(): Promise<RecurringTransaction[]> {
+  const raw: any[] = await invoke("list_recurring_transactions")
+  return raw.map(toCamelRecurringTransaction)
+}
+
+export interface CreateRecurringPayload {
+  frequency: string
+  intervalCount?: number
+  nextDate: string
+  endDate?: string | null
+  autoExecute?: boolean
+  isActive?: boolean
+  description: string
+  currencyCode?: string
+  notes?: string | null
+  num?: string | null
+  splits: { accountId: number; debit: number; credit: number; memo?: string | null }[]
+}
+
+export async function createRecurringTransaction(
+  payload: CreateRecurringPayload,
+): Promise<RecurringTransaction> {
+  const raw: any = await invoke("create_recurring_transaction", {
+    payload: {
+      frequency: payload.frequency,
+      interval_count: payload.intervalCount,
+      next_date: payload.nextDate,
+      end_date: payload.endDate ?? null,
+      auto_execute: payload.autoExecute,
+      is_active: payload.isActive,
+      description: payload.description,
+      currency_code: payload.currencyCode,
+      notes: payload.notes,
+      num: payload.num,
+      splits: payload.splits.map((s) => ({
+        account_id: s.accountId,
+        debit: s.debit,
+        credit: s.credit,
+        memo: s.memo ?? null,
+      })),
+    },
+  })
+  return toCamelRecurringTransaction(raw)
+}
+
+export interface UpdateRecurringPayload {
+  id: number
+  frequency?: string
+  intervalCount?: number
+  nextDate?: string
+  endDate?: string | null
+  autoExecute?: boolean
+  isActive?: boolean
+  description?: string
+  currencyCode?: string
+  notes?: string | null
+  num?: string | null
+  splits?: { accountId: number; debit: number; credit: number; memo?: string | null }[]
+}
+
+export async function updateRecurringTransaction(
+  payload: UpdateRecurringPayload,
+): Promise<RecurringTransaction> {
+  const raw: any = await invoke("update_recurring_transaction", {
+    payload: {
+      id: payload.id,
+      frequency: payload.frequency,
+      interval_count: payload.intervalCount,
+      next_date: payload.nextDate,
+      end_date: payload.endDate,
+      auto_execute: payload.autoExecute,
+      is_active: payload.isActive,
+      description: payload.description,
+      currency_code: payload.currencyCode,
+      notes: payload.notes,
+      num: payload.num,
+      splits: payload.splits?.map((s) => ({
+        account_id: s.accountId,
+        debit: s.debit,
+        credit: s.credit,
+        memo: s.memo ?? null,
+      })),
+    },
+  })
+  return toCamelRecurringTransaction(raw)
+}
+
+export async function deleteRecurringTransaction(id: number): Promise<void> {
+  return await invoke("delete_recurring_transaction", { id })
+}
+
+export async function executeRecurringTransaction(
+  id: number,
+): Promise<RecurringTransaction> {
+  const raw: any = await invoke("execute_recurring_transaction", { id })
+  return toCamelRecurringTransaction(raw)
 }

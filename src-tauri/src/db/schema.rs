@@ -140,7 +140,7 @@ pub const POST_MIGRATION_INDEXES: &[&str] = &[
     "CREATE INDEX IF NOT EXISTS idx_txn_date_state ON transactions(post_date, state)",
 ];
 
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 
 // Each entry runs only when the stored version is less than the key.
 // Keys must be sequential, starting from the first version to migrate.
@@ -287,6 +287,38 @@ pub const MIGRATIONS: &[(i64, &[&str])] = &[
                 created_at      TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
             )",
+        ],
+    ),
+    (
+        5,
+        &[
+            "CREATE TABLE IF NOT EXISTS recurring_transactions (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                frequency       TEXT NOT NULL CHECK(frequency IN ('DAILY','WEEKLY','BIWEEKLY','MONTHLY','QUARTERLY','SEMI_ANNUAL','ANNUAL')),
+                interval_count  INTEGER NOT NULL DEFAULT 1,
+                next_date       TEXT NOT NULL,
+                end_date        TEXT,
+                auto_execute    INTEGER NOT NULL DEFAULT 0,
+                last_generated  TEXT,
+                is_active       INTEGER NOT NULL DEFAULT 1,
+                description     TEXT NOT NULL DEFAULT '',
+                currency_code   TEXT NOT NULL DEFAULT 'USD',
+                notes           TEXT,
+                num             TEXT,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            "CREATE INDEX IF NOT EXISTS idx_recurring_next_date ON recurring_transactions(next_date)",
+            "CREATE INDEX IF NOT EXISTS idx_recurring_active ON recurring_transactions(is_active)",
+            "CREATE TABLE IF NOT EXISTS recurring_splits (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                recurring_id    INTEGER NOT NULL REFERENCES recurring_transactions(id) ON DELETE CASCADE,
+                account_id      INTEGER NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+                debit           INTEGER NOT NULL DEFAULT 0,
+                credit          INTEGER NOT NULL DEFAULT 0,
+                memo            TEXT
+            )",
+            "CREATE INDEX IF NOT EXISTS idx_recurring_splits_rec ON recurring_splits(recurring_id)",
         ],
     ),
 ];

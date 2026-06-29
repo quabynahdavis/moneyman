@@ -38,10 +38,17 @@ export interface Transaction {
   updatedAt?: string
 }
 
+export interface RecurringSplit {
+  id?: number
+  recurringId?: number
+  accountId: number
+  debit: number
+  credit: number
+  memo: string | null
+}
+
 export interface RecurringTransaction {
   id?: number
-  templateTxnId: number
-  templateTransaction?: Transaction
   frequency: RecurringFrequency
   intervalCount: number
   nextDate: string
@@ -49,6 +56,13 @@ export interface RecurringTransaction {
   autoExecute: boolean
   lastGenerated: string | null
   isActive: boolean
+  description: string
+  currencyCode: string
+  notes: string | null
+  num: string | null
+  splits: RecurringSplit[]
+  createdAt?: string
+  updatedAt?: string
 }
 
 export function isTransactionBalanced(splits: Split[]): boolean {
