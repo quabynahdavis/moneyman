@@ -94,15 +94,7 @@ pub fn list_accounts(db: State<Database>) -> Result<Vec<Account>, String> {
                 ) AS TEXT)
                 FROM splits s
                 JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
-                WHERE s.account_id IN (
-                    WITH RECURSIVE desc_ids AS (
-                        SELECT id FROM accounts WHERE parent_id = a.id
-                        UNION ALL
-                        SELECT acc.id FROM accounts acc JOIN desc_ids ON acc.parent_id = desc_ids.id
-                    )
-                    SELECT id FROM desc_ids
-                    UNION SELECT a.id
-                )
+                WHERE s.account_id = a.id
             ), '0') AS balance
             FROM accounts a
             ORDER BY a.sort_order, a.name",
@@ -140,15 +132,7 @@ fn list_accounts_internal(db: &Database) -> Result<Vec<Account>, String> {
                 ) AS TEXT)
                 FROM splits s
                 JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
-                WHERE s.account_id IN (
-                    WITH RECURSIVE desc_ids AS (
-                        SELECT id FROM accounts WHERE parent_id = a.id
-                        UNION ALL
-                        SELECT acc.id FROM accounts acc JOIN desc_ids ON acc.parent_id = desc_ids.id
-                    )
-                    SELECT id FROM desc_ids
-                    UNION SELECT a.id
-                )
+                WHERE s.account_id = a.id
             ), '0') AS balance
             FROM accounts a
             ORDER BY a.sort_order, a.name",

@@ -1,113 +1,102 @@
 <script setup lang="ts">
-import { ref, computed } from "vue"
 import { ChevronRight } from "@lucide/vue"
-import { Badge, Button } from "@/components/ui"
+import { Badge, Button, Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui"
 import { formatMoney, isNegative } from "@/utils/decimal"
 import { ACCOUNT_TYPE_LABELS } from "@/types"
 import type { AccountNode } from "@/types"
 
-const props = defineProps<{
-  nodes: AccountNode[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    nodes: AccountNode[]
+    depth?: number
+  }>(),
+  {
+    depth: 0,
+  },
+)
 
 const emit = defineEmits<{
   select: [node: AccountNode]
 }>()
 
-const expanded = ref<Set<number>>(new Set())
-
-function collectDescendantIds(node: AccountNode): number[] {
-  const ids: number[] = [node.id]
-  if (node.children) {
-    for (const child of node.children) {
-      ids.push(...collectDescendantIds(child))
-    }
-  }
-  return ids
-}
-
-function toggle(node: AccountNode) {
-  const ids = collectDescendantIds(node)
-  const s = new Set(expanded.value)
-  if (s.has(node.id)) {
-    for (const id of ids) s.delete(id)
-  } else {
-    for (const id of ids) s.add(id)
-  }
-  expanded.value = s
-}
-
-function isOpen(id: number) {
-  return expanded.value.has(id)
-}
-
 function onRowClick(node: AccountNode) {
-  if (node.children && node.children.length > 0) {
-    toggle(node)
-  }
+  emit("select", node)
 }
-
-const flatRows = computed(() => {
-  const result: { node: AccountNode; depth: number }[] = []
-  function walk(nodes: AccountNode[], depth: number) {
-    for (const node of nodes) {
-      result.push({ node, depth })
-      if (node.children && node.children.length > 0 && isOpen(node.id)) {
-        walk(node.children, depth + 1)
-      }
-    }
-  }
-  walk(props.nodes, 0)
-  return result
-})
 </script>
 
 <template>
-  <div role="tree">
-    <div
-      v-for="item in flatRows"
-      :key="item.node.id"
-      role="treeitem"
-      :aria-expanded="item.node.children && item.node.children.length > 0 ? isOpen(item.node.id) : undefined"
-    >
-      <div
-        class="flex items-center gap-2 px-4 py-2.5 hover:bg-muted/50 select-none text-sm border-b last:border-b-0 group"
-        :class="{
-          'opacity-60 italic': item.node.isPlaceholder,
-          'cursor-pointer': item.node.children && item.node.children.length > 0,
-        }"
-        :style="{ paddingLeft: `${item.depth * 24 + 16}px` }"
-        @click="onRowClick(item.node)"
-      >
-        <div
-          class="w-4 h-4 flex items-center justify-center shrink-0 cursor-pointer"
-          @click.stop="toggle(item.node)"
+  <div class="w-full">
+    <Accordion type="multiple" class="w-full">
+      <template v-for="node in nodes" :key="node.id">
+        <!-- Parent account with sub-accounts: render as AccordionItem -->
+        <AccordionItem
+          v-if="node.children && node.children.length > 0"
+          :value="String(node.id)"
+          class="border-b last:border-b-0"
         >
-          <ChevronRight
-            v-if="item.node.children && item.node.children.length > 0"
-            class="h-4 w-4 text-muted-foreground transition-transform duration-150"
-            :class="{ 'rotate-90': isOpen(item.node.id) }"
-          />
+          <div
+            class="flex items-center gap-2 px-4 py-2 hover:bg-muted/50 select-none text-sm group cursor-pointer"
+            :class="{ 'opacity-60 italic': node.isPlaceholder }"
+            :style="{ paddingLeft: `${depth * 24 + 16}px` }"
+            @click="onRowClick(node)"
+          >
+            <AccordionTrigger
+              class="w-4 h-4 p-0 flex items-center justify-center shrink-0 hover:no-underline [&[data-state=open]>svg]:rotate-90"
+              @click.stop
+            >
+              <template #icon>
+                <ChevronRight class="h-4 w-4 text-muted-foreground transition-transform duration-150" />
+              </template>
+            </AccordionTrigger>
+
+            <span v-if="node.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ node.code }}</span>
+            <span class="flex-1 font-medium truncate">{{ node.name }}</span>
+            <Badge variant="secondary" class="text-xs shrink-0">{{ ACCOUNT_TYPE_LABELS[node.accountType] }}</Badge>
+            <span
+              class="font-mono tabular-nums text-right w-28 shrink-0"
+              :class="isNegative(node.balance) ? 'text-rose-500' : ''"
+            >{{ formatMoney(node.balance) }}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0 font-medium"
+              @click.stop="emit('select', node)"
+            >View</Button>
+          </div>
+
+          <AccordionContent>
+            <!-- Recursive call for children -->
+            <AccountTree
+              :nodes="node.children"
+              :depth="depth + 1"
+              @select="emit('select', $event)"
+            />
+          </AccordionContent>
+        </AccordionItem>
+
+        <!-- Leaf account: render as simple row -->
+        <div
+          v-else
+          class="flex items-center gap-2 px-4 py-2 hover:bg-muted/50 select-none text-sm border-b last:border-b-0 group cursor-pointer"
+          :style="{ paddingLeft: `${depth * 24 + 16}px` }"
+          @click="onRowClick(node)"
+        >
+          <div class="w-4 h-4 shrink-0" />
+          <span v-if="node.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ node.code }}</span>
+          <span class="flex-1 font-medium truncate">{{ node.name }}</span>
+          <Badge variant="secondary" class="text-xs shrink-0">{{ ACCOUNT_TYPE_LABELS[node.accountType] }}</Badge>
+          <span
+            class="font-mono tabular-nums text-right w-28 shrink-0"
+            :class="isNegative(node.balance) ? 'text-rose-500' : ''"
+          >{{ formatMoney(node.balance) }}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0 font-medium"
+            @click.stop="emit('select', node)"
+          >View</Button>
         </div>
-
-        <span v-if="item.node.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ item.node.code }}</span>
-
-        <span class="flex-1 font-medium truncate">{{ item.node.name }}</span>
-
-        <Badge variant="secondary" class="text-xs shrink-0">{{ ACCOUNT_TYPE_LABELS[item.node.accountType] }}</Badge>
-
-        <span
-          class="font-mono tabular-nums text-right w-28 shrink-0"
-          :class="isNegative(item.node.balance) ? 'text-rose-500' : ''"
-        >{{ formatMoney(item.node.balance) }}</span>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0"
-          @click.stop="emit('select', item.node)"
-        >View</Button>
-      </div>
-    </div>
+      </template>
+    </Accordion>
   </div>
 </template>

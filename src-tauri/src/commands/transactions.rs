@@ -72,6 +72,24 @@ pub fn post_transaction(
         ));
     }
 
+    // Validate: no splits reference a placeholder account
+    for s in &payload.splits {
+        let is_placeholder: i64 = conn
+            .query_row(
+                "SELECT is_placeholder FROM accounts WHERE id = ?1",
+                params![s.account_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        if is_placeholder != 0 {
+            return Err(format!(
+                "Cannot post transaction to placeholder account (ID: {})",
+                s.account_id
+            ));
+        }
+    }
+
     // Insert transaction
     conn.execute(
         "INSERT INTO transactions (currency_code, description, notes, payee, number, date, date_posted, state)

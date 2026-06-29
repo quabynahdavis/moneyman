@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "@/compo
 import { useAccountStore } from "@/stores/accountStore"
 import { formatMoney, isNegative } from "@/utils/decimal"
 import { ACCOUNT_TYPE_LABELS } from "@/types"
-import { ArrowLeft, ArrowRightToLine } from "@lucide/vue"
+import { ArrowLeft } from "@lucide/vue"
 import type { AccountNode } from "@/types"
 
 const route = useRoute()
@@ -35,8 +35,12 @@ onMounted(() => {
   }
 })
 
-function viewLedger(id: number) {
-  router.push({ name: "account-ledger", params: { accountId: id } })
+function selectAccount(child: AccountNode) {
+  if (child.children && child.children.length > 0) {
+    router.push({ name: "account-detail", params: { accountId: child.id } })
+  } else {
+    router.push({ name: "account-ledger", params: { accountId: child.id } })
+  }
 }
 </script>
 
@@ -70,7 +74,8 @@ function viewLedger(id: number) {
           <div
             v-for="child in children"
             :key="child.id"
-            class="flex items-center gap-2 px-4 py-3 hover:bg-muted/50 group"
+            class="flex items-center gap-2 px-4 py-3 hover:bg-muted/50 group cursor-pointer"
+            @click="selectAccount(child)"
           >
             <span v-if="child.code" class="text-xs text-muted-foreground font-mono tabular-nums w-14 shrink-0">{{ child.code }}</span>
             <span class="flex-1 font-medium text-sm truncate">{{ child.name }}</span>
@@ -79,7 +84,14 @@ function viewLedger(id: number) {
               class="font-mono tabular-nums text-right w-28 shrink-0 text-sm"
               :class="isNegative(child.balance) ? 'text-rose-500' : ''"
             >{{ formatMoney(child.balance) }}</span>
-            <Button variant="ghost" size="sm" class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0" @click="viewLedger(child.id)">Ledger</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0 font-medium"
+              @click.stop="selectAccount(child)"
+            >
+              {{ child.children && child.children.length > 0 ? "View" : "Ledger" }}
+            </Button>
           </div>
         </div>
       </CardContent>

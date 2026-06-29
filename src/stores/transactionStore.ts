@@ -2,6 +2,7 @@ import { defineStore } from "pinia"
 import { ref, computed } from "vue"
 import type { Transaction, RecurringTransaction } from "@/types"
 import { useAccountingEngine } from "@/composables/useAccountingEngine"
+import { useAccountStore } from "./accountStore"
 import * as api from "@/services/api"
 import Decimal from "decimal.js"
 
@@ -84,6 +85,13 @@ export const useTransactionStore = defineStore("transactions", () => {
       const txn = await api.postTransaction(payload)
       transactions.value.unshift(txn)
       totalTransactions.value++
+      
+      const accountStore = useAccountStore()
+      await Promise.all([
+        accountStore.fetchAccounts(),
+        accountStore.fetchAccountTree(),
+      ])
+
       return txn
     } catch (e: any) {
       error.value = typeof e === "string" ? e : e.message || "Failed to post transaction"
@@ -97,6 +105,12 @@ export const useTransactionStore = defineStore("transactions", () => {
       await api.voidTransaction(id)
       transactions.value = transactions.value.filter((t) => t.id !== id)
       totalTransactions.value = Math.max(0, totalTransactions.value - 1)
+
+      const accountStore = useAccountStore()
+      await Promise.all([
+        accountStore.fetchAccounts(),
+        accountStore.fetchAccountTree(),
+      ])
     } catch (e: any) {
       error.value = typeof e === "string" ? e : e.message || "Failed to void transaction"
       throw error.value
