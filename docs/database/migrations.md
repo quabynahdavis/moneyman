@@ -17,5 +17,6 @@ Migrations are defined as an array of `(version, [sql_stmts])` tuples in `schema
 |---|---|
 | 1 | Initial schema (account_types lookup table, `placeholder` column) |
 | 2 | Rename `placeholder` → `is_placeholder`, add CHECK constraint on `account_type` |
+| 3 | Drop old `splits`/`transactions` tables, recreate with `debit`/`credit` as INTEGER (cents), `post_date`, `num`, `reconcile_state` |
 
 Fresh databases skip all migrations — they are created at the latest schema version directly.

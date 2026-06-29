@@ -34,10 +34,12 @@ price_quotes
   ↳ account_id → accounts.id
 ```
 
-## Key Design Points
+## Key Design Points (v3)
 
-- **`debit_amount` / `credit_amount`** are stored as TEXT (decimal strings), not REAL.
-- **`is_placeholder`** on accounts prevents posting transactions to parent nodes (formerly named `placeholder`, migrated via schema v1→v2).
+- **`debit` / `credit`** are stored as INTEGER (cents), not TEXT or REAL — all monetary math uses strict 64-bit integer arithmetic.
+- **`reconcile_state`** on splits is constrained to `'n'` (unreconciled), `'c'` (cleared), or `'r'` (reconciled).
+- **`post_date`** is the transaction date (ISO 8601 text); **`num`** holds optional check/reference numbers.
+- **`is_placeholder`** on accounts prevents posting transactions to parent nodes.
 - **account_type** has a CHECK constraint enforcing the fixed set of GnuCash type codes.
-- **Recursive CTE balance rollup** — The `list_accounts` and `get_account_tree` commands use a recursive CTE to sum leaf balances up the hierarchy.
-- **Schema versioning** — The `schema_version` table tracks the current version; migrations in `schema.rs` run sequentially on startup.
+- **Recursive CTE balance rollup** — The `list_accounts` and `get_account_tree` commands use a recursive CTE to sum leaf balances (converted from cents to dollars via `/ 100.0`) up the hierarchy.
+- **Schema versioning** — The `schema_version` table tracks the current version; migrations in `schema.rs` run sequentially on startup. Post-migration indexes run after all migrations to avoid column-not-found errors on upgrade.

@@ -1,34 +1,37 @@
-# Split Ledger Table
+# Ledger Table
 
-The `SplitLedgerTable` component renders a sortable, filterable, paginated register using `@tanstack/vue-table`.
+The `LedgerTable` component renders a context-aware transaction register with running balance, contextual column headers, and right-click context menus.
 
 ## Props
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
 | `transactions` | `Transaction[]` | Required | Data source |
-| `showAccountColumn` | `boolean` | `false` | Show account name column |
+| `accountId` | `number \| null` | Required | Filters splits to this account; `null` for global ledger |
+| `accountType` | `string \| null` | `null` | Determines column header labels and normal balance direction |
 
 ## Features
 
-- **Sorting** — Click column headers to sort ascending/descending (date, payee, amount, state)
-- **Global Filter** — Text input filters across description, payee, and number
-- **Expandable Splits** — Click the date cell to expand/collapse individual split rows
-- **Column Visibility** — Account column is conditionally rendered via `showAccountColumn`
+- **Contextual Headers** — Column labels for debit/credit swap based on account type (see `ACCOUNT_CONTEXT_LABELS` in `ledgerStore.ts`).
+- **Transfer Column** — For 2-split transactions, shows the opposite account name; for multi-split, shows "— Split Transaction —".
+- **Running Balance** — Cumulative sum of (debit − credit), adjusted for normal balance direction, computed client-side in cents.
+- **Expandable Splits** — Click any row to expand/collapse a nested detail table showing individual split lines.
+- **Right-Click Context Menu** — Right-click any row for Edit / Void actions.
+- **Ellipsis Dropdown** — Hover any row to reveal a ⋮ button with the same actions.
+- **Right-Aligned Numbers** — All monetary columns use `tabular-nums` for vertical alignment of decimal points.
 
-## Row Types
+## Events
 
-### Transaction Row
-Shows date, number, payee, description, memo, debit, credit, and state badge. The date cell contains the expand/collapse chevron.
-
-### Split Row
-Shows individual journal entry legs with account name, memo, debit, and credit amounts. Rendered at half-height (text-xs) with muted foreground.
+| Event | Payload | Description |
+|---|---|---|
+| `void-transaction` | `txnId: number` | Emitted when user clicks Void |
+| `edit-transaction` | `txnId: number` | Emitted when user clicks Edit |
 
 ## State Indicators
 
 | Badge | Meaning |
 |---|---|
-| `RECONCILED` (green) | Matched bank statement |
-| `CLEARED` (yellow) | Pending confirmation |
-| `VOID` (red) | Cancelled |
-| `UNRECONCILED` (gray) | Not yet processed |
+| `R` (green) | Reconciled — matched bank statement |
+| `C` (blue) | Cleared — pending confirmation |
+| `V` (red) | Void — cancelled transaction |
+| (none) | Unreconciled — not yet processed |

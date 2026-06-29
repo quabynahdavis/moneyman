@@ -8,7 +8,7 @@ Manages transactions, splits, and recurring schedules.
 - `recurringTransactions: RecurringTransaction[]`
 - `loading`, `error`
 - Pagination: `currentPage`, `pageSize` (default 50)
-- Sorting: `sortField` (date/payee/amount/state), `sortDirection`
+- Sorting: `sortField` (post_date/description/state/num), `sortDirection`
 - Filters: `filterText`, `filterAccountId`, `filterState`
 
 ## Computed
@@ -16,7 +16,6 @@ Manages transactions, splits, and recurring schedules.
 | Property | Description |
 |---|---|
 | `totalTransactions` | Count |
-| `filteredTransactions` | Sorted + filtered list |
 | `paginatedTransactions` | Current page slice |
 | `totalPages` | Page count |
 | `upcomingRecurring` | Active recurring items due today or earlier |
@@ -25,11 +24,10 @@ Manages transactions, splits, and recurring schedules.
 
 | Method | Description |
 |---|---|
-| `computeTxnTotal(txn)` | Absolute total of all splits |
-| `addTransaction(txn)` | Validates balance, prepends |
-| `updateTransaction(id, updates)` | Validates if splits changed |
-| `removeTransaction(id)` | Remove by ID |
-| `setTransactions(data)` | Bulk replace |
+| `fetchTransactions()` | API-backed paginated fetch with current filters/sort |
+| `postNewTransaction(payload)` | Validates balance, posts via API, refreshes accounts |
+| `voidExistingTransaction(id)` | Soft-delete via API, refreshes accounts |
 | `setSort(field)` | Toggle sort direction |
 | `setPage(page)` | Navigate pages |
-| `addRecurring(rt) / removeRecurring(id)` | Manage schedules |
+
+All monetary values use **integer cents**. Validation uses strict integer equality (`===`), not floating-point epsilon.
