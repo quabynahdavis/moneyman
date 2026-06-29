@@ -14,17 +14,25 @@ import {
   Menu,
   Sun,
   Moon,
+  Monitor,
   Search,
   ArrowLeft,
   ArrowRight,
   RefreshCw,
+  Check,
 } from "@lucide/vue"
 import { ref, computed, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { Toaster } from "vue-sonner"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
+import {
+  Popover as AppPopover,
+  PopoverTrigger as AppPopoverTrigger,
+  PopoverContent as AppPopoverContent,
+} from "@/components/ui"
 
 const ui = useUiStore()
+import type { Theme } from "@/stores/uiStore"
 const router = useRouter()
 const route = useRoute()
 
@@ -85,9 +93,16 @@ const navItems = [
 
 const sidebarWidth = computed(() => (ui.sidebarCollapsed ? "w-16" : "w-56"))
 
-function toggleTheme() {
-  ui.setTheme(ui.isDark ? "light" : "dark")
-}
+const themeOptions: Array<{ value: Theme; label: string; icon: any }> = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+]
+
+const currentThemeIcon = computed(() => {
+  const opt = themeOptions.find((o) => o.value === ui.theme)
+  return opt?.icon ?? Sun
+})
 
 // Route-specific refresh handlers
 function refreshCurrentPage() {
@@ -147,15 +162,33 @@ function refreshCurrentPage() {
       </nav>
 
       <div class="border-t p-2">
-        <button
-          @click="toggleTheme"
-          class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent"
-        >
-          <component :is="ui.isDark ? Sun : Moon" class="h-4 w-4 shrink-0" />
-          <span v-if="!ui.sidebarCollapsed">
-            {{ ui.isDark ? "Light" : "Dark" }} Mode
-          </span>
-        </button>
+        <AppPopover>
+          <AppPopoverTrigger as-child>
+            <button
+              class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent"
+            >
+              <component :is="currentThemeIcon" class="h-4 w-4 shrink-0" />
+              <span v-if="!ui.sidebarCollapsed">Theme</span>
+            </button>
+          </AppPopoverTrigger>
+          <AppPopoverContent
+            side="right"
+            :side-offset="16"
+            align="start"
+            class="w-40 p-1"
+          >
+            <button
+              v-for="opt in themeOptions"
+              :key="opt.value"
+              class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              @click="ui.setTheme(opt.value)"
+            >
+              <component :is="opt.icon" class="h-4 w-4 shrink-0" />
+              <span class="flex-1 text-left">{{ opt.label }}</span>
+              <Check v-if="ui.theme === opt.value" class="h-3.5 w-3.5 text-primary" />
+            </button>
+          </AppPopoverContent>
+        </AppPopover>
       </div>
     </aside>
 
