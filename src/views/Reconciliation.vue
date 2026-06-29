@@ -13,6 +13,7 @@ import { useReconciliationStore } from "@/stores/reconciliationStore"
 import { useAccountStore } from "@/stores/accountStore"
 import { cn } from "@/lib/utils"
 import AccountPicker from "@/components/AccountPicker.vue"
+import DatePicker from "@/components/DatePicker.vue"
 
 const route = useRoute()
 const router = useRouter()
@@ -129,7 +130,7 @@ function viewAccount(id: number) {
           </div>
           <div class="space-y-1">
             <Label>Statement Date</Label>
-            <Input v-model="statementDate" type="date" />
+            <DatePicker v-model="statementDate" />
           </div>
           <div class="space-y-1">
             <Label>Starting Balance</Label>

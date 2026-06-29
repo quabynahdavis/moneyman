@@ -4,30 +4,16 @@ import { useRouter } from "vue-router"
 import { Button, Input, Label } from "@/components/ui"
 import { useAccountStore } from "@/stores/accountStore"
 import { useTransactionStore } from "@/stores/transactionStore"
-import { CalendarIcon, Plus, Trash2, AlertCircle } from "@lucide/vue"
+import { Plus, Trash2, AlertCircle } from "@lucide/vue"
 import { toCents } from "@/utils/decimal"
 import AccountPicker from "@/components/AccountPicker.vue"
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { getLocalTimeZone, today, parseDate } from "@internationalized/date"
-import { cn } from "@/lib/utils"
+import DatePicker from "@/components/DatePicker.vue"
 
 const router = useRouter()
 const accountStore = useAccountStore()
 const txnStore = useTransactionStore()
 
 const postDateStr = ref(new Date().toISOString().split("T")[0])
-const postDate = computed({
-  get: () => {
-    try { return parseDate(postDateStr.value) }
-    catch { return today(getLocalTimeZone()) }
-  },
-  set: (val) => { postDateStr.value = val.toString() },
-})
 const description = ref("")
 const num = ref("")
 
@@ -132,24 +118,7 @@ async function save() {
     <div class="grid grid-cols-2 gap-3">
       <div class="space-y-1">
         <Label>Date</Label>
-        <Popover>
-          <PopoverTrigger as-child>
-            <Button
-              variant="outline"
-              :class="cn('w-full justify-start text-left font-normal', !postDateStr && 'text-muted-foreground')"
-            >
-              <CalendarIcon class="mr-2 h-4 w-4 shrink-0" />
-              {{ new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(postDate.toDate(getLocalTimeZone())) }}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent class="w-auto p-0">
-            <Calendar
-              v-model="postDate"
-              :initial-focus="true"
-              :default-placeholder="today(getLocalTimeZone())"
-            />
-          </PopoverContent>
-        </Popover>
+        <DatePicker v-model="postDateStr" />
       </div>
       <div class="space-y-1"><Label>Num</Label><Input v-model="num" placeholder="Check #" /></div>
       <div class="space-y-1 col-span-2"><Label>Description</Label><Input v-model="description" placeholder="Payee or description" /></div>
