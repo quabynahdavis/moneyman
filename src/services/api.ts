@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { Account, AccountNode, Split, Transaction } from "@/types"
+import type { Account, AccountNode, Split, Transaction, ReconciliationData, ImportPreviewItem, CommitImportResult, ImportProfile } from "@/types"
 
 // ── Account API ──────────────────────────────────────────────────────────
 
@@ -246,4 +246,178 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     totalExpenses: raw.total_expenses,
     totalCash: raw.total_cash,
   }
+}
+
+// ── Reconciliation API ─────────────────────────────────────────────────────
+
+export interface StartReconciliationPayload {
+  accountId: number
+  statementDate: string
+  endingBalance: number
+  startingBalance: number
+}
+
+function toCamelReconcileSplit(raw: any): any {
+  return {
+    id: raw.id,
+    transactionId: raw.transaction_id,
+    accountId: raw.account_id,
+    accountName: raw.account_name,
+    accountType: raw.account_type,
+    postDate: raw.post_date,
+    description: raw.description,
+    num: raw.num,
+    debit: raw.debit,
+    credit: raw.credit,
+    memo: raw.memo,
+    reconcileState: raw.reconcile_state,
+  }
+}
+
+function toCamelReconciliationData(raw: any): ReconciliationData {
+  return {
+    session: {
+      id: raw.session.id,
+      accountId: raw.session.account_id,
+      statementDate: raw.session.statement_date,
+      endingBalance: raw.session.ending_balance,
+      startingBalance: raw.session.starting_balance,
+      state: raw.session.state,
+      createdAt: raw.session.created_at,
+      completedAt: raw.session.completed_at,
+    },
+    splits: (raw.splits ?? []).map(toCamelReconcileSplit),
+    clearedTotal: raw.cleared_total,
+    difference: raw.difference,
+  }
+}
+
+export async function startReconciliation(
+  payload: StartReconciliationPayload,
+): Promise<ReconciliationData> {
+  const raw: any = await invoke("start_reconciliation", {
+    payload: {
+      account_id: payload.accountId,
+      statement_date: payload.statementDate,
+      ending_balance: payload.endingBalance,
+      starting_balance: payload.startingBalance,
+    },
+  })
+  return toCamelReconciliationData(raw)
+}
+
+export async function getReconciliationData(
+  sessionId: number,
+): Promise<ReconciliationData> {
+  const raw: any = await invoke("get_reconciliation_data", {
+    sessionId,
+  })
+  return toCamelReconciliationData(raw)
+}
+
+export async function toggleSplitReconcileState(
+  splitId: number,
+): Promise<string> {
+  return await invoke("toggle_split_reconcile_state", { splitId })
+}
+
+export async function finalizeReconciliation(
+  sessionId: number,
+): Promise<ReconciliationData> {
+  const raw: any = await invoke("finalize_reconciliation", { sessionId })
+  return toCamelReconciliationData(raw)
+}
+
+export async function checkReconciledSplit(splitId: number): Promise<boolean> {
+  return await invoke("check_reconciled_split", { splitId })
+}
+
+// ── Import API ─────────────────────────────────────────────────────────────
+
+function toCamelImportPreviewItem(raw: any): ImportPreviewItem {
+  return {
+    rowIndex: raw.row_index,
+    date: raw.date,
+    description: raw.description,
+    amountCents: raw.amount_cents,
+    debit: raw.debit,
+    credit: raw.credit,
+    memo: raw.memo,
+    num: raw.num,
+    isDuplicate: raw.is_duplicate,
+    matchedTransactionId: raw.matched_transaction_id,
+  }
+}
+
+function toCamelImportProfile(raw: any): ImportProfile {
+  return {
+    id: raw.id,
+    name: raw.name,
+    fileFormat: raw.file_format,
+    columnMapping: raw.column_mapping,
+    defaultAccountId: raw.default_account_id,
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at,
+  }
+}
+
+export async function listImportProfiles(): Promise<ImportProfile[]> {
+  const raw: any[] = await invoke("list_import_profiles")
+  return raw.map(toCamelImportProfile)
+}
+
+export async function saveImportProfile(payload: {
+  name: string
+  fileFormat: string
+  columnMapping: string
+  defaultAccountId?: number | null
+}): Promise<ImportProfile> {
+  const raw: any = await invoke("save_import_profile", {
+    payload: {
+      name: payload.name,
+      file_format: payload.fileFormat,
+      column_mapping: payload.columnMapping,
+      default_account_id: payload.defaultAccountId ?? null,
+    },
+  })
+  return toCamelImportProfile(raw)
+}
+
+export async function deleteImportProfile(id: number): Promise<void> {
+  return await invoke("delete_import_profile", { id })
+}
+
+export async function previewCsvImport(
+  rawContent: string,
+  headerMap: string,
+): Promise<ImportPreviewItem[]> {
+  const raw: any[] = await invoke("preview_csv_import", {
+    rawContent,
+    headerMap,
+  })
+  return raw.map(toCamelImportPreviewItem)
+}
+
+export async function commitImport(payload: {
+  accountId: number
+  items: any[]
+}): Promise<CommitImportResult> {
+  const raw: any = await invoke("commit_import", {
+    payload: {
+      account_id: payload.accountId,
+      items: payload.items.map((i: any) => ({
+        row_index: i.rowIndex,
+        date: i.date,
+        description: i.description,
+        amount_cents: i.amountCents,
+        debit: i.debit,
+        credit: i.credit,
+        memo: i.memo,
+        num: i.num,
+        is_duplicate: i.isDuplicate,
+        matched_transaction_id: i.matchedTransactionId,
+      })),
+    },
+  })
+  return { imported: raw.imported, skipped: raw.skipped }
 }

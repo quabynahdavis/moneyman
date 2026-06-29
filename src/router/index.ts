@@ -53,6 +53,18 @@ const router = createRouter({
       meta: { title: "Reconciliation" },
     },
     {
+      path: "/reconciliation/:accountId",
+      name: "reconciliation-session",
+      component: () => import("@/views/Reconciliation.vue"),
+      meta: { title: "Reconciliation" },
+    },
+    {
+      path: "/import",
+      name: "import",
+      component: () => import("@/views/ImportWizard.vue"),
+      meta: { title: "Import" },
+    },
+    {
       path: "/reports",
       name: "reports",
       component: () => import("@/views/Reports.vue"),

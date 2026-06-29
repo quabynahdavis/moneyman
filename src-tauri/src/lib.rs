@@ -32,6 +32,16 @@ pub fn run() {
             commands::transactions::list_transactions,
             commands::transactions::void_transaction,
             commands::transactions::get_dashboard_summary,
+            commands::reconciliation::start_reconciliation,
+            commands::reconciliation::get_reconciliation_data,
+            commands::reconciliation::toggle_split_reconcile_state,
+            commands::reconciliation::finalize_reconciliation,
+            commands::reconciliation::check_reconciled_split,
+            commands::import::list_import_profiles,
+            commands::import::save_import_profile,
+            commands::import::delete_import_profile,
+            commands::import::preview_csv_import,
+            commands::import::commit_import,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

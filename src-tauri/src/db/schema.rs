@@ -140,7 +140,7 @@ pub const POST_MIGRATION_INDEXES: &[&str] = &[
     "CREATE INDEX IF NOT EXISTS idx_txn_date_state ON transactions(post_date, state)",
 ];
 
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 
 // Each entry runs only when the stored version is less than the key.
 // Keys must be sequential, starting from the first version to migrate.
@@ -260,6 +260,33 @@ pub const MIGRATIONS: &[(i64, &[&str])] = &[
             FROM transactions t
             JOIN splits s ON s.transaction_id = t.id
             JOIN accounts a ON a.id = s.account_id",
+        ],
+    ),
+    (
+        4,
+        &[
+            // Reconciliation sessions
+            "CREATE TABLE IF NOT EXISTS reconciliation_sessions (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id      INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                statement_date  TEXT NOT NULL,
+                ending_balance  INTEGER NOT NULL DEFAULT 0,
+                starting_balance INTEGER NOT NULL DEFAULT 0,
+                state           TEXT NOT NULL DEFAULT 'open' CHECK(state IN ('open', 'completed', 'cancelled')),
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                completed_at    TEXT
+            )",
+            "CREATE INDEX IF NOT EXISTS idx_recon_sessions_account ON reconciliation_sessions(account_id)",
+            // Import profiles for user-defined column mappings
+            "CREATE TABLE IF NOT EXISTS import_profiles (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                name            TEXT NOT NULL,
+                file_format     TEXT NOT NULL CHECK(file_format IN ('CSV', 'OFX')),
+                column_mapping  TEXT NOT NULL,
+                default_account_id INTEGER REFERENCES accounts(id),
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
         ],
     ),
 ];
