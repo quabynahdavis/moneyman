@@ -6,18 +6,21 @@
 
 ## Features
 
-- **Double-Entry Accounting Engine** — Every transaction is validated for balance (debits = credits) using `decimal.js` arbitrary-precision math.
+- **Double-Entry Accounting Engine** — Every transaction is validated for balance (debits = credits) using strict integer cents.
 - **Split Transactions** — Model complex receipts and invoices across multiple accounts, assets, and categories.
 - **Chart of Accounts** — Hierarchical tree with recursive balance rollups (Assets, Liabilities, Equity, Income, Expenses).
-- **General Ledger** — Sortable, filterable, paginated register with expandable split rows (TanStack Table).
+- **General Ledger** — Sortable, filterable, paginated register with expandable split rows and context menus.
+- **Account Picker** — Modal with tabbed hierarchy, drill-down navigation, and global search.
+- **Calendar Date Picker** — Self-contained calendar widget for transaction date entry.
+- **Reconciliation Engine** — Match ledger entries against bank statements with live difference tracking.
+- **Import Automation** — 4-step CSV import wizard (upload → map columns → preview → commit) with duplicate detection.
 - **Multi-Currency** — Track accounts in distinct fiat currencies with historical exchange rates and trading accounts.
 - **Investments** — Stock and mutual fund accounts with cost-basis tracking and price quote syncing.
 - **Invoicing** — Full A/R and A/P lifecycle: create, send, track, and reconcile invoices and bills.
 - **Budgeting** — Monthly/quarterly/annual spending targets with actual-vs-budget tracking.
-- **Reconciliation** — Match ledger entries against bank statements with live balance comparison.
 - **Scheduled Transactions** — Recurring rules for bills and income with auto-execute or prompt-on-startup.
 - **Reports** — Balance Sheet, Profit & Loss, Cash Flow, Portfolio Valuation.
-- **Dark Mode** — Full light/dark/system theme support with persistent preference.
+- **Dark Mode** — Light/Dark/System theme selector via sidebar popover with persistent preference.
 
 ---
 
@@ -32,7 +35,7 @@
 | Routing | [vue-router](https://router.vuejs.org) |
 | Table | [@tanstack/vue-table](https://tanstack.com/table/v8) |
 | Icons | [Lucide](https://lucide.dev) |
-| Precision Math | [decimal.js](https://github.com/MikeMcl/decimal.js) |
+| Monetary Math | Integer cents (`i64`/`number`) |
 | Dialogs | [Reka UI](https://reka-ui.com) / [vaul-vue](https://vaul.emilkowal.ski) |
 | Persistence | SQLite (via Tauri's `tauri-plugin-sql` or `rusqlite`) |
 | Database Schema | See [database-schema.sql](./database-schema.sql) |
@@ -62,44 +65,52 @@ The Vite dev server runs on `http://localhost:1420`. Tauri wraps it in a native 
 src/
 ├── assets/css/main.css          # Tailwind base + CSS variables
 ├── components/
-│   ├── ui/                      # shadcn-vue primitives (17 components)
-│   │   ├── Button.vue
-│   │   ├── Card.vue / Card*.vue
-│   │   ├── Table.vue / Table*.vue
-│   │   ├── Badge.vue
-│   │   ├── Dialog.vue
-│   │   ├── Input.vue / Label.vue
-│   │   ├── Select.vue / SelectItem.vue
+│   ├── ui/                      # shadcn-vue primitives (Accordion, Button, Card, Calendar, Command, Dialog, Input, Label, Popover, Table, Tabs, Select)
 │   │   └── index.ts             # barrel exports
-│   └── SplitLedgerTable.vue     # TanStack table with expandable splits
+│   ├── AccountPicker.vue        # Modal account selector with tabs + drill-down
+│   ├── AccountTree.vue          # Recursive hierarchy with accordion + context menus
+│   ├── Combobox.vue             # Searchable select for enums
+│   ├── ConfirmDialog.vue        # Toast-based confirmation prompt
+│   └── LedgerTable.vue          # TanStack table with expandable splits
 ├── composables/
-│   └── useAccountingEngine.ts   # Double-entry validation, tree builder
+│   ├── useAccountingEngine.ts   # Double-entry validation, tree builder
+│   └── useConfirm.ts            # `vue-sonner` toast-based confirm dialog
 ├── layouts/
-│   └── DefaultLayout.vue        # Sidebar + header + <router-view>
+│   └── DefaultLayout.vue        # Collapsible sidebar + nav stack + theme popover
 ├── lib/utils.ts                 # cn() helper (clsx + tailwind-merge)
-├── router/index.ts              # 9 routes
+├── router/index.ts              # 16 routes (lazy-loaded)
 ├── stores/
-│   ├── accountStore.ts          # Chart of Accounts state
+│   ├── accountStore.ts          # Chart of Accounts state + treeWithRollup
+│   ├── importStore.ts           # Import wizard state machine
+│   ├── ledgerStore.ts           # Ledger account context labels
+│   ├── reconciliationStore.ts   # Reconciliation session + difference equation
+│   ├── settingsStore.ts         # App preferences (localStorage)
 │   ├── transactionStore.ts      # Transactions, filters, pagination
-│   ├── uiStore.ts               # Theme, sidebar, modals
-│   └── settingsStore.ts         # App preferences
+│   └── uiStore.ts               # Theme, sidebar, modals
 ├── types/
-│   ├── account.ts               # Account, AccountType, AccountTreeNode
-│   ├── transaction.ts           # Transaction, Split, RecurringTransaction
+│   ├── account.ts               # Account, AccountNode, AccountType
 │   ├── currency.ts              # Currency, ExchangeRate
+│   ├── import.ts                # ImportProfile, ImportPreviewItem, ColumnMapping
 │   ├── invoice.ts               # Invoice, InvoiceLine, Contact
+│   ├── reconciliation.ts        # ReconciliationSession, ReconcileSplit
+│   ├── transaction.ts           # Transaction, Split, RecurringTransaction
 │   └── index.ts                 # Re-exports
-├── utils/decimal.ts             # decimal.js helpers (formatMoney, add, sub, etc.)
+├── utils/decimal.ts             # decimal.js helpers (formatMoney, toCents, etc.)
 ├── views/
-│   ├── Dashboard.vue
+│   ├── AccountDetail.vue
+│   ├── AccountNew.vue           # Dual create/update via editId query param
 │   ├── Accounts.vue             # Hierarchical account tree
+│   ├── Budgets.vue
+│   ├── Contacts.vue
+│   ├── Dashboard.vue
+│   ├── ImportWizard.vue         # 4-step CSV import (upload→map→preview→commit)
+│   ├── Invoices.vue
 │   ├── Ledger.vue               # General ledger / register
-│   ├── Reconciliation.vue
+│   ├── Reconciliation.vue       # Split-pane bank reconciliation
 │   ├── Reports.vue
 │   ├── ScheduledTransactions.vue
-│   ├── Invoices.vue
-│   ├── Contacts.vue
-│   └── Budgets.vue
+│   ├── Settings.vue
+│   └── TransactionNew.vue       # Split transaction form with date picker + account picker
 ├── App.vue
 └── main.ts                      # Entry point (Pinia + Router)
 ```

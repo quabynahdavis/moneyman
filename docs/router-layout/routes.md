@@ -11,6 +11,8 @@
 | `/ledger/:accountId` | `account-ledger` | Ledger | "Account Register" |
 | `/transactions/new` | `transaction-new` | TransactionNew | "New Transaction" |
 | `/reconciliation` | `reconciliation` | Reconciliation | "Reconciliation" |
+| `/reconciliation/:accountId` | `reconciliation-session` | Reconciliation | "Reconciliation" |
+| `/import` | `import` | ImportWizard | "Import" |
 | `/reports` | `reports` | Reports | "Reports" |
 | `/scheduled` | `scheduled` | ScheduledTransactions | "Scheduled Transactions" |
 | `/invoices` | `invoices` | Invoices | "Invoices & Bills" |
