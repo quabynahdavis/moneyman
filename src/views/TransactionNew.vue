@@ -31,11 +31,11 @@ const postDate = computed({
 const description = ref("")
 const num = ref("")
 
-interface SplitRow { id: number; accountId: string; debitCents: number; creditCents: number; memo: string }
+interface SplitRow { id: number; accountId: string; debitCents: number; creditCents: number; memo: string; debitStr: string; creditStr: string }
 let splitCounter = 0
 const splits = ref<SplitRow[]>([
-  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" },
-  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" },
+  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "", debitStr: "", creditStr: "" },
+  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "", debitStr: "", creditStr: "" },
 ])
 
 const saving = ref(false)
@@ -53,7 +53,7 @@ const isBalanced = computed(() =>
 
 const diffCents = computed(() => Math.abs(totalDebits.value - totalCredits.value))
 
-function addSplit() { splits.value.push({ id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" }) }
+function addSplit() { splits.value.push({ id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "", debitStr: "", creditStr: "" }) }
 function removeSplit(index: number) { if (splits.value.length > 2) splits.value.splice(index, 1) }
 
 function parseCents(value: string): number {
@@ -63,22 +63,42 @@ function parseCents(value: string): number {
   return toCents(num)
 }
 
-function onDebitInput(idx: number, value: string) {
-  splits.value[idx].debitCents = parseCents(value)
-  splits.value[idx].creditCents = 0
+function onDebitFocus(idx: number) {
+  const s = splits.value[idx]
+  if (s.debitCents) s.debitStr = (s.debitCents / 100).toFixed(2)
+}
+function onDebitBlur(idx: number) {
+  const s = splits.value[idx]
+  s.debitCents = parseCents(s.debitStr)
+  s.creditCents = 0
+  s.creditStr = ""
+  if (s.debitCents) s.debitStr = (s.debitCents / 100).toFixed(2)
 }
 
-function onCreditInput(idx: number, value: string) {
-  splits.value[idx].creditCents = parseCents(value)
-  splits.value[idx].debitCents = 0
+function onCreditFocus(idx: number) {
+  const s = splits.value[idx]
+  if (s.creditCents) s.creditStr = (s.creditCents / 100).toFixed(2)
+}
+function onCreditBlur(idx: number) {
+  const s = splits.value[idx]
+  s.creditCents = parseCents(s.creditStr)
+  s.debitCents = 0
+  s.debitStr = ""
+  if (s.creditCents) s.creditStr = (s.creditCents / 100).toFixed(2)
+}
+
+function clearAmounts(idx: number) {
+  const s = splits.value[idx]
+  s.debitCents = 0; s.debitStr = ""
+  s.creditCents = 0; s.creditStr = ""
 }
 
 function autoBalance() {
   const diff = totalDebits.value - totalCredits.value
   if (diff === 0) return
   const last = splits.value[splits.value.length - 1]
-  if (diff > 0) { last.creditCents = diff; last.debitCents = 0 }
-  else { last.debitCents = -diff; last.creditCents = 0 }
+  if (diff > 0) { last.creditCents = diff; last.debitCents = 0; last.creditStr = (diff / 100).toFixed(2); last.debitStr = "" }
+  else { last.debitCents = -diff; last.creditCents = 0; last.debitStr = ((-diff) / 100).toFixed(2); last.creditStr = "" }
 }
 
 async function save() {
@@ -162,22 +182,26 @@ async function save() {
               </td>
               <td class="px-3 py-1.5">
                 <input
-                  :value="split.debitCents ? (split.debitCents / 100).toFixed(2) : ''"
+                  v-model="split.debitStr"
                   type="text"
                   inputmode="decimal"
                   placeholder="0.00"
                   class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-right font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  @input="onDebitInput(idx, ($event.target as HTMLInputElement).value)"
+                  @focus="onDebitFocus(idx)"
+                  @blur="onDebitBlur(idx)"
+                  @input="split.creditStr = ''"
                 />
               </td>
               <td class="px-3 py-1.5">
                 <input
-                  :value="split.creditCents ? (split.creditCents / 100).toFixed(2) : ''"
+                  v-model="split.creditStr"
                   type="text"
                   inputmode="decimal"
                   placeholder="0.00"
                   class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-right font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  @input="onCreditInput(idx, ($event.target as HTMLInputElement).value)"
+                  @focus="onCreditFocus(idx)"
+                  @blur="onCreditBlur(idx)"
+                  @input="split.debitStr = ''"
                 />
               </td>
               <td class="px-3 py-1.5">
