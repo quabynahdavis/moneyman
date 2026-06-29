@@ -62,6 +62,12 @@ impl Database {
             }
         }
 
+        // Create post-migration indexes (safe after tables are fully migrated)
+        for stmt in schema::POST_MIGRATION_INDEXES {
+            // Ignore errors (index may already exist or column may not exist yet)
+            let _ = conn.execute_batch(stmt);
+        }
+
         Ok(())
     }
 }
