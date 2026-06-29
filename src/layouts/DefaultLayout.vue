@@ -91,7 +91,7 @@ function toggleTheme() {
 function refreshCurrentPage() {
   const name = route.name as string
   if (name === "accounts") {
-    import("@/stores/accountStore").then((m) => m.useAccountStore().fetchAccountTree())
+    import("@/stores/accountStore").then((m) => m.useAccountStore().fetchAccounts())
   } else if (name === "dashboard") {
     // Dashboard refreshes on mount, just re-mount by toggling key
     window.location.reload()

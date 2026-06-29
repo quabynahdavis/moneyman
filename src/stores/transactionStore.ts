@@ -87,10 +87,7 @@ export const useTransactionStore = defineStore("transactions", () => {
       totalTransactions.value++
       
       const accountStore = useAccountStore()
-      await Promise.all([
-        accountStore.fetchAccounts(),
-        accountStore.fetchAccountTree(),
-      ])
+      await accountStore.fetchAccounts()
 
       return txn
     } catch (e: any) {
@@ -107,10 +104,7 @@ export const useTransactionStore = defineStore("transactions", () => {
       totalTransactions.value = Math.max(0, totalTransactions.value - 1)
 
       const accountStore = useAccountStore()
-      await Promise.all([
-        accountStore.fetchAccounts(),
-        accountStore.fetchAccountTree(),
-      ])
+      await accountStore.fetchAccounts()
     } catch (e: any) {
       error.value = typeof e === "string" ? e : e.message || "Failed to void transaction"
       throw error.value

@@ -2,11 +2,11 @@ import { defineStore } from "pinia"
 import { ref, computed } from "vue"
 import type { Account, AccountNode } from "@/types"
 import { Decimal, toDecimal } from "@/utils/decimal"
+import { buildAccountTree } from "@/utils/accountTree"
 import * as api from "@/services/api"
 
 export const useAccountStore = defineStore("accounts", () => {
   const accounts = ref<Account[]>([])
-  const tree = ref<AccountNode[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -33,7 +33,10 @@ export const useAccountStore = defineStore("accounts", () => {
     })
   }
 
-  const treeWithRollup = computed(() => rollupBalances(tree.value))
+  const treeWithRollup = computed(() => {
+    const raw = buildAccountTree(accounts.value)
+    return rollupBalances(raw)
+  })
 
   function getAccountById(id: number): Account | undefined {
     return accountMap.value.get(id)
@@ -95,24 +98,11 @@ export const useAccountStore = defineStore("accounts", () => {
     }
   }
 
-  async function fetchAccountTree() {
-    loading.value = true
-    error.value = null
-    try {
-      tree.value = await api.getAccountTree()
-    } catch (e: any) {
-      error.value = typeof e === "string" ? e : e.message || "Failed to fetch account tree"
-    } finally {
-      loading.value = false
-    }
-  }
-
   async function createNewAccount(payload: api.CreateAccountPayload) {
     error.value = null
     try {
       const account = await api.createAccount(payload)
       accounts.value.push(account)
-      await fetchAccountTree()
       return account
     } catch (e: any) {
       error.value = typeof e === "string" ? e : e.message || "Failed to create account"
@@ -128,7 +118,6 @@ export const useAccountStore = defineStore("accounts", () => {
       if (idx !== -1) {
         accounts.value[idx] = account
       }
-      await fetchAccountTree()
       return account
     } catch (e: any) {
       error.value = typeof e === "string" ? e : e.message || "Failed to update account"
@@ -138,7 +127,6 @@ export const useAccountStore = defineStore("accounts", () => {
 
   return {
     accounts,
-    tree,
     loading,
     error,
     treeWithRollup,
@@ -153,7 +141,6 @@ export const useAccountStore = defineStore("accounts", () => {
     updateAccountInStore,
     removeAccount,
     fetchAccounts,
-    fetchAccountTree,
     createNewAccount,
     updateExistingAccount,
   }

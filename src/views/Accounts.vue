@@ -10,7 +10,7 @@ import type { AccountNode } from "@/types"
 const accountStore = useAccountStore()
 const router = useRouter()
 
-onMounted(() => accountStore.fetchAccountTree())
+onMounted(() => accountStore.fetchAccounts())
 
 function onSelect(node: AccountNode) {
   if (node.children && node.children.length > 0) {
@@ -29,7 +29,7 @@ function onSelect(node: AccountNode) {
         <p class="text-sm text-muted-foreground">Manage your account hierarchy</p>
       </div>
       <div class="flex gap-2">
-        <Button variant="outline" size="sm" @click="accountStore.fetchAccountTree()">
+        <Button variant="outline" size="sm" @click="accountStore.fetchAccounts()">
           <RefreshCw class="h-4 w-4 mr-1" /> Refresh
         </Button>
         <Button @click="router.push({ name: 'account-new' })">

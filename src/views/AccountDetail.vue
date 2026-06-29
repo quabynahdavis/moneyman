@@ -30,8 +30,8 @@ const account = computed(() => findNode(accountStore.treeWithRollup, accountId.v
 const children = computed(() => account.value?.children ?? [])
 
 onMounted(() => {
-  if (accountStore.tree.length === 0) {
-    accountStore.fetchAccountTree()
+  if (accountStore.accounts.length === 0) {
+    accountStore.fetchAccounts()
   }
 })
 
