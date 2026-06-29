@@ -12,12 +12,12 @@ fn row_to_split(row: &rusqlite::Row) -> rusqlite::Result<Split> {
         account_id: row.get("account_id")?,
         account_name: row.get("account_name")?,
         account_type: row.get("account_type")?,
-        debit_amount: row.get("debit_amount")?,
-        credit_amount: row.get("credit_amount")?,
+        debit: row.get("debit")?,
+        credit: row.get("credit")?,
         memo: row.get("memo")?,
+        reconcile_state: row.get("reconcile_state")?,
         quantity: row.get("quantity")?,
         action: row.get("action")?,
-        reconciled_date: row.get("reconciled_date")?,
     })
 }
 
@@ -53,23 +53,22 @@ pub fn post_transaction(
         return Err("Transaction must have at least 2 splits".to_string());
     }
 
-    // Validate: debits == credits
-    let total_debits: f64 = payload
-        .splits
-        .iter()
-        .map(|s| s.debit_amount.parse::<f64>().unwrap_or(0.0))
-        .sum();
-    let total_credits: f64 = payload
-        .splits
-        .iter()
-        .map(|s| s.credit_amount.parse::<f64>().unwrap_or(0.0))
-        .sum();
+    // Validate: debits == credits using strict integer math
+    let total_debits: i64 = payload.splits.iter().map(|s| s.debit).sum();
+    let total_credits: i64 = payload.splits.iter().map(|s| s.credit).sum();
 
-    if (total_debits - total_credits).abs() > 0.0001 {
+    if total_debits != total_credits {
         return Err(format!(
-            "Transaction out of balance: debits={}, credits={}",
+            "Transaction out of balance: debits={} cents, credits={} cents",
             total_debits, total_credits
         ));
+    }
+
+    // Validate: no split has both debit and credit non-zero
+    for s in &payload.splits {
+        if s.debit > 0 && s.credit > 0 {
+            return Err("Split cannot have both debit and credit amounts".to_string());
+        }
     }
 
     // Validate: no splits reference a placeholder account
@@ -90,18 +89,25 @@ pub fn post_transaction(
         }
     }
 
+    let description = payload
+        .description
+        .clone()
+        .unwrap_or_else(|| "".to_string());
+    let post_date = payload
+        .post_date
+        .clone()
+        .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
+
     // Insert transaction
     conn.execute(
-        "INSERT INTO transactions (currency_code, description, notes, payee, number, date, date_posted, state)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO transactions (currency_code, description, notes, num, post_date, state)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![
             payload.currency_code.as_deref().unwrap_or("USD"),
-            payload.description,
+            description,
             payload.notes,
-            payload.payee,
-            payload.number,
-            payload.date.as_deref().unwrap_or(""),
-            payload.date_posted.as_deref().unwrap_or(""),
+            payload.num,
+            post_date,
             payload.state.as_deref().unwrap_or("UNRECONCILED"),
         ],
     )
@@ -112,13 +118,13 @@ pub fn post_transaction(
     // Insert splits
     for s in &payload.splits {
         conn.execute(
-            "INSERT INTO splits (transaction_id, account_id, debit_amount, credit_amount, memo, quantity, action)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO splits (transaction_id, account_id, debit, credit, memo, reconcile_state, quantity, action)
+             VALUES (?1, ?2, ?3, ?4, ?5, 'n', ?6, ?7)",
             params![
                 txn_id,
                 s.account_id,
-                s.debit_amount,
-                s.credit_amount,
+                s.debit,
+                s.credit,
                 s.memo,
                 s.quantity,
                 s.action,
@@ -140,10 +146,8 @@ pub fn post_transaction(
                 currency_code: row.get("currency_code")?,
                 description: row.get("description")?,
                 notes: row.get("notes")?,
-                payee: row.get("payee")?,
-                number: row.get("number")?,
-                date: row.get("date")?,
-                date_posted: row.get("date_posted")?,
+                num: row.get("num")?,
+                post_date: row.get("post_date")?,
                 state: row.get("state")?,
                 splits,
                 created_at: Some(row.get("created_at")?),
@@ -165,14 +169,14 @@ pub fn list_transactions(
     let page = query.page.unwrap_or(1).max(1);
     let page_size = query.page_size.unwrap_or(50).max(1).min(500);
     let offset = (page - 1) * page_size;
-    let sort_field = query.sort_field.unwrap_or_else(|| "date".to_string());
+    let sort_field = query.sort_field.unwrap_or_else(|| "post_date".to_string());
     let sort_dir = query.sort_direction.unwrap_or_else(|| "desc".to_string());
 
-    let allowed_sort_fields = ["date", "payee", "state", "description", "number"];
+    let allowed_sort_fields = ["post_date", "description", "state", "num"];
     let sort_col = if allowed_sort_fields.contains(&sort_field.as_str()) {
         &sort_field
     } else {
-        "date"
+        "post_date"
     };
     let dir = if sort_dir == "asc" { "ASC" } else { "DESC" };
 
@@ -184,10 +188,9 @@ pub fn list_transactions(
     if let Some(ref filter_text) = query.filter_text {
         if !filter_text.is_empty() {
             where_clauses.push(
-                "(t.description LIKE ? OR t.payee LIKE ? OR t.number LIKE ?)".to_string(),
+                "(t.description LIKE ? OR t.num LIKE ?)".to_string(),
             );
             let pattern = format!("%{}%", filter_text);
-            param_values.push(Box::new(pattern.clone()));
             param_values.push(Box::new(pattern.clone()));
             param_values.push(Box::new(pattern));
         }
@@ -240,8 +243,6 @@ pub fn list_transactions(
         .map_err(|e| e.to_string())?;
 
     drop(stmt);
-    drop(param_refs);
-    drop(all_params);
 
     let mut transactions = Vec::new();
 
@@ -259,10 +260,8 @@ pub fn list_transactions(
                     currency_code: row.get("currency_code")?,
                     description: row.get("description")?,
                     notes: row.get("notes")?,
-                    payee: row.get("payee")?,
-                    number: row.get("number")?,
-                    date: row.get("date")?,
-                    date_posted: row.get("date_posted")?,
+                    num: row.get("num")?,
+                    post_date: row.get("post_date")?,
                     state: row.get("state")?,
                     splits,
                     created_at: Some(row.get("created_at")?),
@@ -299,111 +298,94 @@ pub fn void_transaction(db: State<Database>, id: i64) -> Result<(), String> {
 pub fn get_dashboard_summary(db: State<Database>) -> Result<serde_json::Value, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
-    // Total assets (account types with normal debit balance)
-    let total_assets: String = conn
-        .query_row(
-            "SELECT CAST(COALESCE(SUM(bal.balance), 0) AS TEXT) FROM (
-                SELECT COALESCE((
-                    SELECT CAST(SUM(
-                        CAST(COALESCE(s.debit_amount, '0') AS REAL)
-                        - CAST(COALESCE(s.credit_amount, '0') AS REAL)
-                    ) AS REAL)
-                    FROM splits s
-                    JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
-                    WHERE s.account_id IN (
-                        WITH RECURSIVE desc_ids AS (
-                            SELECT id FROM accounts WHERE parent_id = a.id
-                            UNION ALL
-                            SELECT acc.id FROM accounts acc JOIN desc_ids ON acc.parent_id = desc_ids.id
-                        )
-                        SELECT id FROM desc_ids
-                        UNION SELECT a.id
+    // Helper: query balance for a set of account types (returns cents as i64)
+    fn query_balance(
+        conn: &rusqlite::Connection,
+        types: &[&str],
+        check_sign: Option<&str>,
+    ) -> Result<i64, String> {
+        let sign_condition = match check_sign {
+            Some("positive") => " AND bal.balance > 0",
+            Some("negative") => " AND bal.balance < 0",
+            _ => "",
+        };
+        let type_list = types
+            .iter()
+            .map(|t| format!("'{}'", t))
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "SELECT COALESCE(SUM(bal.balance), 0) FROM (
+                SELECT COALESCE(SUM(s.debit - s.credit), 0) AS balance
+                FROM splits s
+                JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
+                WHERE s.account_id IN (
+                    WITH RECURSIVE desc_ids AS (
+                        SELECT id FROM accounts WHERE parent_id = a.id
+                        UNION ALL
+                        SELECT acc.id FROM accounts acc JOIN desc_ids ON acc.parent_id = desc_ids.id
                     )
-                ), 0) AS balance
+                    SELECT id FROM desc_ids
+                    UNION SELECT a.id
+                )
                 FROM accounts a
-                WHERE a.account_type IN ('ASSET', 'BANK', 'CASH', 'INVESTMENT', 'STOCK', 'MUTUAL_FUND', 'RECEIVABLE')
+                WHERE a.account_type IN ({})
                 AND a.is_active = 1
-            ) bal WHERE bal.balance > 0",
+            ) bal{}",
+            type_list, sign_condition
+        );
+        conn.query_row(&sql, [], |row| row.get(0))
+            .map_err(|e| e.to_string())
+    }
+
+    let total_assets = query_balance(
+        &conn,
+        &["ASSET", "BANK", "CASH", "INVESTMENT", "STOCK", "MUTUAL_FUND", "RECEIVABLE"],
+        Some("positive"),
+    )?;
+
+    let total_liabilities = query_balance(
+        &conn,
+        &["LIABILITY", "CREDIT_CARD", "PAYABLE"],
+        Some("negative"),
+    )?;
+
+    // Income this month: sum credits on income accounts (normal credit balance)
+    let total_income: i64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(s.credit), 0) FROM splits s
+             JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
+             JOIN accounts a ON a.id = s.account_id
+             WHERE a.account_type = 'INCOME'
+             AND t.post_date >= date('now', 'start of month')
+             AND t.post_date < date('now', 'start of month', '+1 month')",
             [],
             |row| row.get(0),
         )
-        .unwrap_or_else(|_| "0".to_string());
+        .map_err(|e| e.to_string())?;
 
-    // Total liabilities
-    let total_liabilities: String = conn
+    // Expenses this month: sum debits on expense accounts
+    let total_expenses: i64 = conn
         .query_row(
-            "SELECT CAST(COALESCE(SUM(bal.balance), 0) AS TEXT) FROM (
-                SELECT COALESCE((
-                    SELECT CAST(SUM(
-                        CAST(COALESCE(s.debit_amount, '0') AS REAL)
-                        - CAST(COALESCE(s.credit_amount, '0') AS REAL)
-                    ) AS REAL)
-                    FROM splits s
-                    JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
-                    WHERE s.account_id IN (
-                        WITH RECURSIVE desc_ids AS (
-                            SELECT id FROM accounts WHERE parent_id = a.id
-                            UNION ALL
-                            SELECT acc.id FROM accounts acc JOIN desc_ids ON acc.parent_id = desc_ids.id
-                        )
-                        SELECT id FROM desc_ids
-                        UNION SELECT a.id
-                    )
-                ), 0) AS balance
-                FROM accounts a
-                WHERE a.account_type IN ('LIABILITY', 'CREDIT_CARD', 'PAYABLE')
-                AND a.is_active = 1
-            ) bal WHERE bal.balance < 0",
+            "SELECT COALESCE(SUM(s.debit), 0) FROM splits s
+             JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
+             JOIN accounts a ON a.id = s.account_id
+             WHERE a.account_type = 'EXPENSE'
+             AND t.post_date >= date('now', 'start of month')
+             AND t.post_date < date('now', 'start of month', '+1 month')",
             [],
             |row| row.get(0),
         )
-        .unwrap_or_else(|_| "0".to_string());
+        .map_err(|e| e.to_string())?;
 
-    // Total income this month
-    let total_income: String = conn
+    // Cash accounts (IDs 3,4,5) balance
+    let total_cash: i64 = conn
         .query_row(
-            "SELECT CAST(COALESCE(SUM(
-                CAST(COALESCE(s.credit_amount, '0') AS REAL)
-            ), 0) AS TEXT) FROM splits s
-            JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
-            JOIN accounts a ON a.id = s.account_id
-            WHERE a.account_type = 'INCOME'
-            AND t.date >= date('now', 'start of month')
-            AND t.date < date('now', 'start of month', '+1 month')",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or_else(|_| "0".to_string());
-
-    // Total expenses this month
-    let total_expenses: String = conn
-        .query_row(
-            "SELECT CAST(COALESCE(SUM(
-                CAST(COALESCE(s.debit_amount, '0') AS REAL)
-            ), 0) AS TEXT) FROM splits s
-            JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
-            JOIN accounts a ON a.id = s.account_id
-            WHERE a.account_type = 'EXPENSE'
-            AND t.date >= date('now', 'start of month')
-            AND t.date < date('now', 'start of month', '+1 month')",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or_else(|_| "0".to_string());
-
-    // Cash accounts sum
-    let total_cash: String = conn
-        .query_row(
-            "SELECT CAST(COALESCE(SUM(bal.balance), 0) AS TEXT) FROM (
-                SELECT COALESCE((
-                    SELECT CAST(SUM(
-                        CAST(COALESCE(s.debit_amount, '0') AS REAL)
-                        - CAST(COALESCE(s.credit_amount, '0') AS REAL)
-                    ) AS REAL)
-                    FROM splits s
-                    JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
-                    WHERE s.account_id = a.id
-                ), 0) AS balance
+            "SELECT COALESCE(SUM(bal.balance), 0) FROM (
+                SELECT COALESCE(SUM(s.debit - s.credit), 0) AS balance
+                FROM splits s
+                JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
+                WHERE s.account_id = a.id
                 FROM accounts a
                 WHERE a.id IN (3, 4, 5)
                 AND a.is_active = 1
@@ -411,13 +393,9 @@ pub fn get_dashboard_summary(db: State<Database>) -> Result<serde_json::Value, S
             [],
             |row| row.get(0),
         )
-        .unwrap_or_else(|_| "0".to_string());
-
-    let net_worth_val: f64 =
-        total_assets.parse::<f64>().unwrap_or(0.0) - total_liabilities.parse::<f64>().unwrap_or(0.0);
+        .map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({
-        "net_worth": net_worth_val.to_string(),
         "total_assets": total_assets,
         "total_liabilities": total_liabilities,
         "total_income": total_income,

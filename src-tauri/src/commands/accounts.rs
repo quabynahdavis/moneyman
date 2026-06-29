@@ -69,10 +69,7 @@ fn build_tree(accounts: Vec<Account>) -> Vec<AccountNode> {
 
 fn compute_balance_for_account(conn: &rusqlite::Connection, account_id: i64) -> Result<String, String> {
     conn.query_row(
-        "SELECT CAST(COALESCE(SUM(
-            CAST(COALESCE(s.debit_amount, '0') AS REAL)
-            - CAST(COALESCE(s.credit_amount, '0') AS REAL)
-        ), 0) AS TEXT) FROM splits s
+        "SELECT CAST(CAST(COALESCE(SUM(s.debit - s.credit), 0) AS REAL) / 100.0 AS TEXT) FROM splits s
         JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
         WHERE s.account_id = ?1",
         params![account_id],
@@ -88,10 +85,7 @@ pub fn list_accounts(db: State<Database>) -> Result<Vec<Account>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT a.*, COALESCE((
-                SELECT CAST(SUM(
-                    CAST(COALESCE(s.debit_amount, '0') AS REAL)
-                    - CAST(COALESCE(s.credit_amount, '0') AS REAL)
-                ) AS TEXT)
+                SELECT CAST(CAST(COALESCE(SUM(s.debit - s.credit), 0) AS REAL) / 100.0 AS TEXT)
                 FROM splits s
                 JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
                 WHERE s.account_id = a.id
@@ -126,10 +120,7 @@ fn list_accounts_internal(db: &Database) -> Result<Vec<Account>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT a.*, COALESCE((
-                SELECT CAST(SUM(
-                    CAST(COALESCE(s.debit_amount, '0') AS REAL)
-                    - CAST(COALESCE(s.credit_amount, '0') AS REAL)
-                ) AS TEXT)
+                SELECT CAST(CAST(COALESCE(SUM(s.debit - s.credit), 0) AS REAL) / 100.0 AS TEXT)
                 FROM splits s
                 JOIN transactions t ON t.id = s.transaction_id AND t.state != 'VOID'
                 WHERE s.account_id = a.id
