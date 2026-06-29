@@ -9,6 +9,8 @@ import {
   Input, Label,
 } from "@/components/ui"
 import AccountPicker from "@/components/AccountPicker.vue"
+import DatePicker from "@/components/DatePicker.vue"
+import { toCents } from "@/utils/decimal"
 import {
   CalendarClock, Plus, Play, Pencil, Trash2, ToggleLeft, ToggleRight,
   AlertCircle, Check,
@@ -32,11 +34,11 @@ const formEndDate = ref("")
 const formAutoExecute = ref(false)
 const formNum = ref("")
 
-interface FormSplit { id: number; accountId: string; debitCents: number; creditCents: number; memo: string }
+interface FormSplit { id: number; accountId: string; debitCents: number; creditCents: number; memo: string; debitStr: string; creditStr: string }
 let splitCounter = 0
 const formSplits = ref<FormSplit[]>([
-  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" },
-  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" },
+  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "", debitStr: "", creditStr: "" },
+  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "", debitStr: "", creditStr: "" },
 ])
 
 const formError = ref("")
@@ -64,25 +66,42 @@ const frequencies: { value: RecurringFrequency; label: string }[] = [
 function formatCents(c: number) { return (c / 100).toFixed(2) }
 
 function parseCents(v: string): number {
+  if (!v) return 0
   const cleaned = v.replace(/[^0-9.]/g, "")
   const n = parseFloat(cleaned)
-  return isNaN(n) ? 0 : Math.round(n * 100)
+  if (isNaN(n)) return 0
+  return toCents(n)
 }
 
 function addSplit() {
-  formSplits.value.push({ id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" })
+  formSplits.value.push({ id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "", debitStr: "", creditStr: "" })
 }
 function removeSplit(idx: number) {
   if (formSplits.value.length > 2) formSplits.value.splice(idx, 1)
 }
 
-function onDebitInput(idx: number, value: string) {
-  formSplits.value[idx].debitCents = parseCents(value)
-  formSplits.value[idx].creditCents = 0
+function onDebitFocus(idx: number) {
+  const s = formSplits.value[idx]
+  if (s.debitCents) s.debitStr = (s.debitCents / 100).toFixed(2)
 }
-function onCreditInput(idx: number, value: string) {
-  formSplits.value[idx].creditCents = parseCents(value)
-  formSplits.value[idx].debitCents = 0
+function onDebitBlur(idx: number) {
+  const s = formSplits.value[idx]
+  s.debitCents = parseCents(s.debitStr)
+  s.creditCents = 0
+  s.creditStr = ""
+  if (s.debitCents) s.debitStr = (s.debitCents / 100).toFixed(2)
+}
+
+function onCreditFocus(idx: number) {
+  const s = formSplits.value[idx]
+  if (s.creditCents) s.creditStr = (s.creditCents / 100).toFixed(2)
+}
+function onCreditBlur(idx: number) {
+  const s = formSplits.value[idx]
+  s.creditCents = parseCents(s.creditStr)
+  s.debitCents = 0
+  s.debitStr = ""
+  if (s.creditCents) s.creditStr = (s.creditCents / 100).toFixed(2)
 }
 
 function openCreate() {
@@ -106,6 +125,8 @@ function openEdit(txn: NonNullable<ReturnType<typeof store.getById>>) {
     debitCents: s.debit,
     creditCents: s.credit,
     memo: s.memo ?? "",
+    debitStr: s.debit ? (s.debit / 100).toFixed(2) : "",
+    creditStr: s.credit ? (s.credit / 100).toFixed(2) : "",
   }))
   showForm.value = true
   formError.value = ""
@@ -120,8 +141,8 @@ function resetForm() {
   formAutoExecute.value = false
   formNum.value = ""
   formSplits.value = [
-    { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" },
-    { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" },
+    { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "", debitStr: "", creditStr: "" },
+    { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "", debitStr: "", creditStr: "" },
   ]
   formError.value = ""
 }
@@ -276,11 +297,11 @@ onMounted(() => {
           </div>
           <div class="space-y-1">
             <Label>Next Date</Label>
-            <Input v-model="formNextDate" type="date" />
+            <DatePicker v-model="formNextDate" />
           </div>
           <div class="space-y-1">
             <Label>End Date (optional)</Label>
-            <Input v-model="formEndDate" type="date" />
+            <DatePicker v-model="formEndDate" placeholder="No end date" />
           </div>
           <div class="space-y-1">
             <Label>Num / Check #</Label>
@@ -320,18 +341,22 @@ onMounted(() => {
                   </td>
                   <td class="px-2 py-1">
                     <input
-                      :value="split.debitCents ? formatCents(split.debitCents) : ''"
+                      v-model="split.debitStr"
                       type="text" inputmode="decimal" placeholder="0.00"
                       class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-right font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      @input="onDebitInput(idx, ($event.target as HTMLInputElement).value)"
+                      @focus="onDebitFocus(idx)"
+                      @blur="onDebitBlur(idx)"
+                      @input="split.creditStr = ''"
                     />
                   </td>
                   <td class="px-2 py-1">
                     <input
-                      :value="split.creditCents ? formatCents(split.creditCents) : ''"
+                      v-model="split.creditStr"
                       type="text" inputmode="decimal" placeholder="0.00"
                       class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-right font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      @input="onCreditInput(idx, ($event.target as HTMLInputElement).value)"
+                      @focus="onCreditFocus(idx)"
+                      @blur="onCreditBlur(idx)"
+                      @input="split.debitStr = ''"
                     />
                   </td>
                   <td class="px-2 py-1">
