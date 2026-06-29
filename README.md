@@ -122,11 +122,12 @@ src/
 Detailed documentation for every subsystem is in the [`docs/`](./docs/) folder:
 
 | Document | Covers |
-|---|---|
+|---|---|---|
 | [Architecture](./docs/architecture/) | Data flow, Tauri ↔ Vue IPC, design decisions |
 | [Database Schema](./docs/database/) | All tables, relationships, indexes, views |
 | [UI Components](./docs/ui-components/) | shadcn-vue components, usage, props |
 | [Accounting Engine](./docs/accounting-engine/) | Double-entry math, split validation, balance rollups |
+| [Transactions](./docs/transactions/) | Transaction structure, split model, states, validation, data flow |
 | [Stores](./docs/stores/) | Pinia stores API, state shape, computed values |
 | [Types](./docs/types/) | TypeScript interfaces, type guards, utilities |
 | [Ledger Table](./docs/ledger-table/) | TanStack table configuration, column definitions, expandable rows |
