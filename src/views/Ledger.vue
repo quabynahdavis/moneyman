@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { Card, CardContent, Button } from "@/components/ui"
 import { useTransactionStore } from "@/stores/transactionStore"
 import { useAccountStore } from "@/stores/accountStore"
-import SplitLedgerTable from "@/components/SplitLedgerTable.vue"
+import { useLedgerStore } from "@/stores/ledgerStore"
+import LedgerTable from "@/components/LedgerTable.vue"
 import { Plus, RefreshCw } from "@lucide/vue"
+import { toast } from "vue-sonner"
+import { useConfirm } from "@/composables/useConfirm"
 
 const route = useRoute()
 const router = useRouter()
 const txnStore = useTransactionStore()
 const accountStore = useAccountStore()
+const ledgerStore = useLedgerStore()
+const { confirm } = useConfirm()
 
 const accountId = computed(() => {
   const id = route.params.accountId
@@ -26,10 +31,42 @@ const title = computed(() =>
 )
 
 onMounted(() => {
-  if (accountId.value) txnStore.filterAccountId = accountId.value
+  if (accountId.value) {
+    txnStore.filterAccountId = accountId.value
+    if (account.value) {
+      ledgerStore.setAccountContext(account.value.accountType)
+    }
+  } else {
+    txnStore.filterAccountId = null
+    ledgerStore.setAccountContext("ASSET")
+  }
   txnStore.fetchTransactions()
   accountStore.fetchAccounts()
 })
+
+watch(account, (acc) => {
+  if (acc) ledgerStore.setAccountContext(acc.accountType)
+})
+
+async function onVoidTransaction(txnId: number) {
+  const ok = await confirm({
+    title: "Void Transaction",
+    message: "Are you sure you want to void this transaction?",
+    confirmLabel: "Void",
+    variant: "destructive",
+  })
+  if (!ok) return
+  try {
+    await txnStore.voidExistingTransaction(txnId)
+    toast.success("Transaction voided")
+  } catch (e: any) {
+    toast.error(typeof e === "string" ? e : "Failed to void transaction")
+  }
+}
+
+function onEditTransaction(txnId: number) {
+  toast.info(`Edit transaction #${txnId} - coming soon`)
+}
 </script>
 
 <template>
@@ -56,7 +93,13 @@ onMounted(() => {
         <div v-if="txnStore.loading" class="text-center text-sm text-muted-foreground py-8">Loading transactions...</div>
         <div v-else-if="txnStore.error" class="text-center text-sm text-destructive py-8">{{ txnStore.error }}</div>
         <div v-else>
-          <SplitLedgerTable :transactions="txnStore.paginatedTransactions" :show-account-column="!accountId" />
+          <LedgerTable
+            :transactions="txnStore.paginatedTransactions"
+            :account-id="accountId"
+            :account-type="account?.accountType ?? null"
+            @void-transaction="onVoidTransaction"
+            @edit-transaction="onEditTransaction"
+          />
         </div>
       </CardContent>
     </Card>

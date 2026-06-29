@@ -5,21 +5,22 @@ import { Button, Input, Label } from "@/components/ui"
 import { useAccountStore } from "@/stores/accountStore"
 import { useTransactionStore } from "@/stores/transactionStore"
 import { Plus, Trash2, AlertCircle } from "@lucide/vue"
+import { toCents } from "@/utils/decimal"
+import Combobox from "@/components/Combobox.vue"
 
 const router = useRouter()
 const accountStore = useAccountStore()
 const txnStore = useTransactionStore()
 
-const date = ref(new Date().toISOString().split("T")[0])
-const payee = ref("")
+const postDate = ref(new Date().toISOString().split("T")[0])
 const description = ref("")
-const number = ref("")
+const num = ref("")
 
-interface SplitRow { id: number; accountId: number | null; debitAmount: string; creditAmount: string; memo: string }
+interface SplitRow { id: number; accountId: string; debitCents: number; creditCents: number; memo: string }
 let splitCounter = 0
 const splits = ref<SplitRow[]>([
-  { id: ++splitCounter, accountId: null, debitAmount: "", creditAmount: "", memo: "" },
-  { id: ++splitCounter, accountId: null, debitAmount: "", creditAmount: "", memo: "" },
+  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" },
+  { id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" },
 ])
 
 const saving = ref(false)
@@ -29,23 +30,54 @@ onMounted(() => accountStore.fetchAccounts())
 
 const leafAccounts = computed(() => accountStore.activeAccounts.filter((a) => !a.isPlaceholder))
 
-const totalDebits = computed(() => splits.value.reduce((s, r) => s + (parseFloat(r.debitAmount) || 0), 0))
-const totalCredits = computed(() => splits.value.reduce((s, r) => s + (parseFloat(r.creditAmount) || 0), 0))
-const isBalanced = computed(() =>
-  Math.abs(totalDebits.value - totalCredits.value) < 0.001 &&
-  splits.value.length >= 2 &&
-  splits.value.every((r) => r.accountId !== null),
+const accountComboboxItems = computed(() =>
+  leafAccounts.value.map((a) => ({
+    value: a.id.toString(),
+    label: `${a.name} (${a.accountType})`,
+  })),
 )
 
-function addSplit() { splits.value.push({ id: ++splitCounter, accountId: null, debitAmount: "", creditAmount: "", memo: "" }) }
+const totalDebits = computed(() => splits.value.reduce((s, r) => s + r.debitCents, 0))
+const totalCredits = computed(() => splits.value.reduce((s, r) => s + r.creditCents, 0))
+const isBalanced = computed(() =>
+  totalDebits.value === totalCredits.value &&
+  splits.value.length >= 2 &&
+  splits.value.every((r) => r.accountId !== ""),
+)
+
+const diffCents = computed(() => Math.abs(totalDebits.value - totalCredits.value))
+
+function addSplit() { splits.value.push({ id: ++splitCounter, accountId: "", debitCents: 0, creditCents: 0, memo: "" }) }
 function removeSplit(index: number) { if (splits.value.length > 2) splits.value.splice(index, 1) }
+
+function parseCents(value: string): number {
+  const cleaned = value.replace(/[^0-9.]/g, "")
+  const num = parseFloat(cleaned)
+  if (isNaN(num)) return 0
+  return toCents(num)
+}
+
+function onDebitInput(idx: number, value: string) {
+  splits.value[idx].debitCents = parseCents(value)
+  splits.value[idx].creditCents = 0
+}
+
+function onCreditInput(idx: number, value: string) {
+  splits.value[idx].creditCents = parseCents(value)
+  splits.value[idx].debitCents = 0
+}
+
+function getAccountLabel(accountId: string): string {
+  const acc = leafAccounts.value.find((a) => a.id.toString() === accountId)
+  return acc ? `${acc.name} (${acc.accountType})` : ""
+}
 
 function autoBalance() {
   const diff = totalDebits.value - totalCredits.value
-  if (Math.abs(diff) < 0.001) return
+  if (diff === 0) return
   const last = splits.value[splits.value.length - 1]
-  if (diff > 0) last.creditAmount = diff.toFixed(2)
-  else last.debitAmount = (-diff).toFixed(2)
+  if (diff > 0) { last.creditCents = diff; last.debitCents = 0 }
+  else { last.debitCents = -diff; last.creditCents = 0 }
 }
 
 async function save() {
@@ -53,14 +85,13 @@ async function save() {
   saving.value = true; error.value = ""
   try {
     await txnStore.postNewTransaction({
-      date: date.value,
-      payee: payee.value || null,
+      postDate: postDate.value,
       description: description.value || null,
-      number: number.value || null,
+      num: num.value || null,
       splits: splits.value.map((s) => ({
-        accountId: s.accountId!,
-        debitAmount: s.debitAmount || "0",
-        creditAmount: s.creditAmount || "0",
+        accountId: parseInt(s.accountId),
+        debit: s.debitCents,
+        credit: s.creditCents,
         memo: s.memo || null,
       })),
     })
@@ -78,10 +109,9 @@ async function save() {
     </div>
 
     <div class="grid grid-cols-2 gap-3">
-      <div class="space-y-1"><Label>Date</Label><Input v-model="date" type="date" /></div>
-      <div class="space-y-1"><Label>Number</Label><Input v-model="number" placeholder="Check #" /></div>
-      <div class="space-y-1 col-span-2"><Label>Payee</Label><Input v-model="payee" placeholder="Payee or counterparty" /></div>
-      <div class="space-y-1 col-span-2"><Label>Description</Label><Input v-model="description" placeholder="Transaction memo" /></div>
+      <div class="space-y-1"><Label>Date</Label><Input v-model="postDate" type="date" /></div>
+      <div class="space-y-1"><Label>Num</Label><Input v-model="num" placeholder="Check #" /></div>
+      <div class="space-y-1 col-span-2"><Label>Description</Label><Input v-model="description" placeholder="Payee or description" /></div>
     </div>
 
     <div>
@@ -102,17 +132,33 @@ async function save() {
           </thead>
           <tbody class="divide-y">
             <tr v-for="(split, idx) in splits" :key="split.id">
-              <td class="px-3 py-1.5">
-                <select v-model="split.accountId" class="w-full rounded border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <option :value="null">Select account...</option>
-                  <option v-for="acc in leafAccounts" :key="acc.id" :value="acc.id">{{ acc.name }}</option>
-                </select>
+              <td class="px-3 py-1.5 min-w-[200px]">
+                <Combobox
+                  :model-value="split.accountId"
+                  :items="accountComboboxItems"
+                  placeholder="Select account..."
+                  @update:model-value="splits[idx].accountId = $event"
+                />
               </td>
               <td class="px-3 py-1.5">
-                <input v-model="split.debitAmount" type="number" step="0.01" min="0" placeholder="0.00" class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-right font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                <input
+                  :value="split.debitCents ? (split.debitCents / 100).toFixed(2) : ''"
+                  type="text"
+                  inputmode="decimal"
+                  placeholder="0.00"
+                  class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-right font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  @input="onDebitInput(idx, ($event.target as HTMLInputElement).value)"
+                />
               </td>
               <td class="px-3 py-1.5">
-                <input v-model="split.creditAmount" type="number" step="0.01" min="0" placeholder="0.00" class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-right font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                <input
+                  :value="split.creditCents ? (split.creditCents / 100).toFixed(2) : ''"
+                  type="text"
+                  inputmode="decimal"
+                  placeholder="0.00"
+                  class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-right font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  @input="onCreditInput(idx, ($event.target as HTMLInputElement).value)"
+                />
               </td>
               <td class="px-3 py-1.5">
                 <input v-model="split.memo" placeholder="Memo" class="w-full rounded border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
@@ -126,11 +172,11 @@ async function save() {
             <tr>
               <td class="px-3 py-1.5 text-xs font-medium text-muted-foreground">
                 Totals
-                <span v-if="!isBalanced" class="ml-2 text-destructive font-semibold">(Off by {{ Math.abs(totalDebits - totalCredits).toFixed(2) }})</span>
+                <span v-if="!isBalanced" class="ml-2 text-destructive font-semibold">(Off by {{ (diffCents / 100).toFixed(2) }})</span>
                 <span v-else class="ml-2 text-emerald-500 font-semibold">Balanced ✓</span>
               </td>
-              <td class="px-3 py-1.5 text-right text-xs font-mono">{{ totalDebits.toFixed(2) }}</td>
-              <td class="px-3 py-1.5 text-right text-xs font-mono">{{ totalCredits.toFixed(2) }}</td>
+              <td class="px-3 py-1.5 text-right text-xs font-mono">{{ (totalDebits / 100).toFixed(2) }}</td>
+              <td class="px-3 py-1.5 text-right text-xs font-mono">{{ (totalCredits / 100).toFixed(2) }}</td>
               <td></td><td></td>
             </tr>
           </tfoot>

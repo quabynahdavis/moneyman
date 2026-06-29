@@ -2,7 +2,7 @@
 import { ref, onMounted } from "vue"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui"
 import { ArrowUp, Wallet, TrendingUp, TrendingDown, PiggyBank } from "@lucide/vue"
-import { formatMoney, isNegative } from "@/utils/decimal"
+import { formatCents } from "@/utils/decimal"
 import * as api from "@/services/api"
 
 const summary = ref<api.DashboardSummary | null>(null)
@@ -33,10 +33,10 @@ onMounted(async () => {
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold">
-              {{ summary ? formatMoney(summary.netWorth) : "$0.00" }}
+              {{ summary ? formatCents(summary.totalAssets - summary.totalLiabilities) : "$0.00" }}
             </div>
             <p class="text-xs text-muted-foreground mt-1">
-              Assets: {{ summary ? formatMoney(summary.totalAssets) : "$0" }}
+              Assets: {{ summary ? formatCents(summary.totalAssets) : "$0" }}
             </p>
           </CardContent>
         </Card>
@@ -48,7 +48,7 @@ onMounted(async () => {
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold text-emerald-500">
-              {{ summary ? formatMoney(summary.totalIncome) : "$0.00" }}
+              {{ summary ? formatCents(summary.totalIncome) : "$0.00" }}
             </div>
           </CardContent>
         </Card>
@@ -60,7 +60,7 @@ onMounted(async () => {
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold text-rose-500">
-              {{ summary ? formatMoney(summary.totalExpenses) : "$0.00" }}
+              {{ summary ? formatCents(summary.totalExpenses) : "$0.00" }}
             </div>
           </CardContent>
         </Card>
@@ -72,7 +72,7 @@ onMounted(async () => {
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold">
-              {{ summary ? formatMoney(summary.totalCash) : "$0.00" }}
+              {{ summary ? formatCents(summary.totalCash) : "$0.00" }}
             </div>
           </CardContent>
         </Card>

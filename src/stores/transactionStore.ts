@@ -4,7 +4,6 @@ import type { Transaction, RecurringTransaction } from "@/types"
 import { useAccountingEngine } from "@/composables/useAccountingEngine"
 import { useAccountStore } from "./accountStore"
 import * as api from "@/services/api"
-import Decimal from "decimal.js"
 
 export const useTransactionStore = defineStore("transactions", () => {
   const transactions = ref<Transaction[]>([])
@@ -13,7 +12,7 @@ export const useTransactionStore = defineStore("transactions", () => {
   const error = ref<string | null>(null)
   const currentPage = ref(1)
   const pageSize = ref(50)
-  const sortField = ref<string>("date")
+  const sortField = ref<string>("postDate")
   const sortDirection = ref<"asc" | "desc">("desc")
   const filterText = ref("")
   const filterAccountId = ref<number | null>(null)
@@ -34,15 +33,6 @@ export const useTransactionStore = defineStore("transactions", () => {
       .filter((r) => r.isActive && r.nextDate <= today)
       .sort((a, b) => a.nextDate.localeCompare(b.nextDate))
   })
-
-  function computeTxnTotal(txn: Transaction): string {
-    return txn.splits
-      .reduce((acc, s) => {
-        return acc.plus(s.debitAmount || "0").minus(s.creditAmount || "0")
-      }, new Decimal(0))
-      .abs()
-      .toString()
-  }
 
   // ── API-backed actions ──
 
@@ -72,12 +62,12 @@ export const useTransactionStore = defineStore("transactions", () => {
     validateBalanced(
       payload.splits.map((s) => ({
         accountId: s.accountId,
-        debitAmount: s.debitAmount,
-        creditAmount: s.creditAmount,
+        debit: s.debit,
+        credit: s.credit,
         memo: s.memo || null,
+        reconcileState: "n" as const,
         quantity: s.quantity || null,
         action: s.action || null,
-        reconciledDate: null,
       })),
     )
     error.value = null
@@ -85,7 +75,7 @@ export const useTransactionStore = defineStore("transactions", () => {
       const txn = await api.postTransaction(payload)
       transactions.value.unshift(txn)
       totalTransactions.value++
-      
+
       const accountStore = useAccountStore()
       await accountStore.fetchAccounts()
 
@@ -142,7 +132,6 @@ export const useTransactionStore = defineStore("transactions", () => {
     paginatedTransactions,
     totalPages,
     upcomingRecurring,
-    computeTxnTotal,
     fetchTransactions,
     postNewTransaction,
     voidExistingTransaction,
