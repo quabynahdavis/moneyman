@@ -1,5 +1,7 @@
 export type TransactionState = "UNRECONCILED" | "CLEARED" | "RECONCILED" | "VOID"
 
+export type ReconcileState = "n" | "c" | "r"
+
 export type RecurringFrequency =
   | "DAILY"
   | "WEEKLY"
@@ -15,23 +17,21 @@ export interface Split {
   accountId: number
   accountName?: string
   accountType?: string
-  debitAmount: string
-  creditAmount: string
+  debit: number
+  credit: number
   memo: string | null
+  reconcileState: ReconcileState
   quantity: string | null
   action: string | null
-  reconciledDate: string | null
 }
 
 export interface Transaction {
   id?: number
   currencyCode: string
-  description: string | null
+  description: string
   notes: string | null
-  payee: string | null
-  number: string | null
-  date: string
-  datePosted: string
+  num: string | null
+  postDate: string
   state: TransactionState
   splits: Split[]
   createdAt?: string
@@ -52,23 +52,17 @@ export interface RecurringTransaction {
 }
 
 export function isTransactionBalanced(splits: Split[]): boolean {
-  const total = splits.reduce(
-    (acc, s) => {
-      const d = new Decimal(s.debitAmount || "0")
-      const c = new Decimal(s.creditAmount || "0")
-      return { debit: acc.debit.plus(d), credit: acc.credit.plus(c) }
-    },
-    { debit: new Decimal(0), credit: new Decimal(0) },
-  )
-  return total.debit.equals(total.credit)
+  const totalDebit = splits.reduce((acc, s) => acc + s.debit, 0)
+  const totalCredit = splits.reduce((acc, s) => acc + s.credit, 0)
+  return totalDebit === totalCredit
 }
 
-export function computeTransactionTotal(splits: Split[]): string {
+export function computeTransactionTotal(splits: Split[]): number {
+  return splits.reduce((acc, s) => acc + s.debit - s.credit, 0)
+}
+
+export function getNetAmount(splits: Split[], accountId: number): number {
   return splits
-    .reduce((acc, s) => {
-      return acc.plus(s.debitAmount || "0").minus(s.creditAmount || "0")
-    }, new Decimal(0))
-    .toString()
+    .filter((s) => s.accountId === accountId)
+    .reduce((acc, s) => acc + s.debit - s.credit, 0)
 }
-
-import Decimal from "decimal.js"

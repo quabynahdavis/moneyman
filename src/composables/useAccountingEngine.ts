@@ -7,24 +7,21 @@ export function useAccountingEngine() {
       throw new Error("Transaction must have at least 2 splits")
     }
 
-    let totalDebits = new Decimal(0)
-    let totalCredits = new Decimal(0)
+    let totalDebits = 0
+    let totalCredits = 0
 
     for (const split of splits) {
-      const d = toDecimal(split.debitAmount || "0")
-      const c = toDecimal(split.creditAmount || "0")
-
-      if (d.greaterThan(0) && c.greaterThan(0)) {
+      if (split.debit > 0 && split.credit > 0) {
         throw new Error("Split cannot have both debit and credit amounts")
       }
 
-      totalDebits = totalDebits.plus(d)
-      totalCredits = totalCredits.plus(c)
+      totalDebits += split.debit
+      totalCredits += split.credit
     }
 
-    if (!totalDebits.equals(totalCredits)) {
+    if (totalDebits !== totalCredits) {
       throw new Error(
-        `Transaction out of balance: debits=${totalDebits.toString()}, credits=${totalCredits.toString()}`,
+        `Transaction out of balance: debits=${totalDebits} cents, credits=${totalCredits} cents`,
       )
     }
   }
@@ -32,22 +29,19 @@ export function useAccountingEngine() {
   function createSimpleSplits(
     debitAccountId: number,
     creditAccountId: number,
-    amount: string,
+    amountCents: number,
     memo?: string,
   ): [Split, Split] {
     return [
-      { accountId: debitAccountId, debitAmount: amount, creditAmount: "0", memo: memo || null, quantity: null, action: null, reconciledDate: null },
-      { accountId: creditAccountId, debitAmount: "0", creditAmount: amount, memo: memo || null, quantity: null, action: null, reconciledDate: null },
+      { accountId: debitAccountId, debit: amountCents, credit: 0, memo: memo || null, reconcileState: "n", quantity: null, action: null },
+      { accountId: creditAccountId, debit: 0, credit: amountCents, memo: memo || null, reconcileState: "n", quantity: null, action: null },
     ]
   }
 
-  function accountNetChange(accountId: number, splits: Split[]): string {
+  function accountNetChange(accountId: number, splits: Split[]): number {
     return splits
       .filter((s) => s.accountId === accountId)
-      .reduce((acc, s) => {
-        return acc.plus(s.debitAmount || "0").minus(s.creditAmount || "0")
-      }, new Decimal(0))
-      .toString()
+      .reduce((acc, s) => acc + s.debit - s.credit, 0)
   }
 
   function computeRunningBalance(
@@ -57,7 +51,7 @@ export function useAccountingEngine() {
   ): { splitId?: number; runningBalance: string }[] {
     let running = toDecimal(startingBalance)
     return splits.map((s) => {
-      const change = toDecimal(s.debitAmount || "0").minus(s.creditAmount || "0")
+      const change = toDecimal(s.debit - s.credit)
       const signedChange = normalBalance === "debit" ? change : change.negated()
       running = running.plus(signedChange)
       return {
@@ -106,12 +100,10 @@ export function useAccountingEngine() {
   function createEmptyTransaction(): Transaction {
     return {
       currencyCode: "USD",
-      description: null,
+      description: "",
       notes: null,
-      payee: null,
-      number: null,
-      date: new Date().toISOString().split("T")[0],
-      datePosted: new Date().toISOString().split("T")[0],
+      num: null,
+      postDate: new Date().toISOString().split("T")[0],
       state: "UNRECONCILED",
       splits: [],
     }
@@ -120,12 +112,12 @@ export function useAccountingEngine() {
   function createEmptySplit(): Split {
     return {
       accountId: 0,
-      debitAmount: "0",
-      creditAmount: "0",
+      debit: 0,
+      credit: 0,
       memo: null,
+      reconcileState: "n",
       quantity: null,
       action: null,
-      reconciledDate: null,
     }
   }
 

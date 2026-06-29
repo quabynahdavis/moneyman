@@ -6,11 +6,11 @@ export function toDecimal(value: string | number | Decimal): Decimal {
   return new Decimal(value)
 }
 
-export function toCents(amount: string | number): string {
-  return toDecimal(amount).times(100).toFixed(0)
+export function toCents(amount: string | number): number {
+  return toDecimal(amount).times(100).toNumber()
 }
 
-export function fromCents(cents: string | number): string {
+export function fromCents(cents: number): string {
   return toDecimal(cents).div(100).toFixed(2)
 }
 
@@ -26,6 +26,10 @@ export function formatMoney(
   const parts = formatted.split(".")
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",")
   return `${negative ? "-" : ""}${currencySymbol}${parts.join(".")}`
+}
+
+export function formatCents(cents: number, currencySymbol = "$"): string {
+  return formatMoney(fromCents(cents), currencySymbol)
 }
 
 export function add(a: string | number, b: string | number): string {

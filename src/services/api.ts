@@ -110,12 +110,12 @@ export async function deleteAccount(id: number): Promise<void> {
   await invoke("delete_account", { id })
 }
 
-// ── Transaction API ──────────────────────────────────────────────────────
+// ── Transaction API (v3: integer cents) ──────────────────────────────────
 
 export interface CreateSplitPayload {
   accountId: number
-  debitAmount: string
-  creditAmount: string
+  debit: number
+  credit: number
   memo?: string | null
   quantity?: string | null
   action?: string | null
@@ -125,10 +125,8 @@ export interface CreateTransactionPayload {
   currencyCode?: string
   description?: string | null
   notes?: string | null
-  payee?: string | null
-  number?: string | null
-  date?: string
-  datePosted?: string
+  num?: string | null
+  postDate?: string
   state?: string
   splits: CreateSplitPayload[]
 }
@@ -157,12 +155,12 @@ function toCamelSplit(raw: any): Split {
     accountId: raw.account_id,
     accountName: raw.account_name,
     accountType: raw.account_type,
-    debitAmount: raw.debit_amount,
-    creditAmount: raw.credit_amount,
+    debit: raw.debit,
+    credit: raw.credit,
     memo: raw.memo ?? null,
+    reconcileState: raw.reconcile_state ?? "n",
     quantity: raw.quantity ?? null,
     action: raw.action ?? null,
-    reconciledDate: raw.reconciled_date ?? null,
   }
 }
 
@@ -170,12 +168,10 @@ function toCamelTransaction(raw: any): Transaction {
   return {
     id: raw.id,
     currencyCode: raw.currency_code,
-    description: raw.description ?? null,
+    description: raw.description ?? "",
     notes: raw.notes ?? null,
-    payee: raw.payee ?? null,
-    number: raw.number ?? null,
-    date: raw.date,
-    datePosted: raw.date_posted,
+    num: raw.num ?? null,
+    postDate: raw.post_date,
     state: raw.state,
     splits: (raw.splits ?? []).map(toCamelSplit),
     createdAt: raw.created_at,
@@ -189,15 +185,13 @@ export async function postTransaction(payload: CreateTransactionPayload): Promis
       currency_code: payload.currencyCode,
       description: payload.description,
       notes: payload.notes,
-      payee: payload.payee,
-      number: payload.number,
-      date: payload.date,
-      date_posted: payload.datePosted,
+      num: payload.num,
+      post_date: payload.postDate,
       state: payload.state,
       splits: payload.splits.map((s) => ({
         account_id: s.accountId,
-        debit_amount: s.debitAmount,
-        credit_amount: s.creditAmount,
+        debit: s.debit,
+        credit: s.credit,
         memo: s.memo,
         quantity: s.quantity,
         action: s.action,
@@ -236,18 +230,16 @@ export async function voidTransaction(id: number): Promise<void> {
 // ── Dashboard API ────────────────────────────────────────────────────────
 
 export interface DashboardSummary {
-  netWorth: string
-  totalAssets: string
-  totalLiabilities: string
-  totalIncome: string
-  totalExpenses: string
-  totalCash: string
+  totalAssets: number
+  totalLiabilities: number
+  totalIncome: number
+  totalExpenses: number
+  totalCash: number
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   const raw: any = await invoke("get_dashboard_summary")
   return {
-    netWorth: raw.net_worth,
     totalAssets: raw.total_assets,
     totalLiabilities: raw.total_liabilities,
     totalIncome: raw.total_income,
