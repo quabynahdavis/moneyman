@@ -4,15 +4,30 @@ import { useRouter } from "vue-router"
 import { Button, Input, Label } from "@/components/ui"
 import { useAccountStore } from "@/stores/accountStore"
 import { useTransactionStore } from "@/stores/transactionStore"
-import { Plus, Trash2, AlertCircle } from "@lucide/vue"
+import { CalendarIcon, Plus, Trash2, AlertCircle } from "@lucide/vue"
 import { toCents } from "@/utils/decimal"
-import Combobox from "@/components/Combobox.vue"
+import AccountPicker from "@/components/AccountPicker.vue"
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { getLocalTimeZone, today, parseDate } from "@internationalized/date"
+import { cn } from "@/lib/utils"
 
 const router = useRouter()
 const accountStore = useAccountStore()
 const txnStore = useTransactionStore()
 
-const postDate = ref(new Date().toISOString().split("T")[0])
+const postDateStr = ref(new Date().toISOString().split("T")[0])
+const postDate = computed({
+  get: () => {
+    try { return parseDate(postDateStr.value) }
+    catch { return today(getLocalTimeZone()) }
+  },
+  set: (val) => { postDateStr.value = val.toString() },
+})
 const description = ref("")
 const num = ref("")
 
@@ -27,15 +42,6 @@ const saving = ref(false)
 const error = ref("")
 
 onMounted(() => accountStore.fetchAccounts())
-
-const leafAccounts = computed(() => accountStore.activeAccounts.filter((a) => !a.isPlaceholder))
-
-const accountComboboxItems = computed(() =>
-  leafAccounts.value.map((a) => ({
-    value: a.id.toString(),
-    label: `${a.name} (${a.accountType})`,
-  })),
-)
 
 const totalDebits = computed(() => splits.value.reduce((s, r) => s + r.debitCents, 0))
 const totalCredits = computed(() => splits.value.reduce((s, r) => s + r.creditCents, 0))
@@ -67,11 +73,6 @@ function onCreditInput(idx: number, value: string) {
   splits.value[idx].debitCents = 0
 }
 
-function getAccountLabel(accountId: string): string {
-  const acc = leafAccounts.value.find((a) => a.id.toString() === accountId)
-  return acc ? `${acc.name} (${acc.accountType})` : ""
-}
-
 function autoBalance() {
   const diff = totalDebits.value - totalCredits.value
   if (diff === 0) return
@@ -85,7 +86,7 @@ async function save() {
   saving.value = true; error.value = ""
   try {
     await txnStore.postNewTransaction({
-      postDate: postDate.value,
+      postDate: postDateStr.value,
       description: description.value || null,
       num: num.value || null,
       splits: splits.value.map((s) => ({
@@ -109,7 +110,27 @@ async function save() {
     </div>
 
     <div class="grid grid-cols-2 gap-3">
-      <div class="space-y-1"><Label>Date</Label><Input v-model="postDate" type="date" /></div>
+      <div class="space-y-1">
+        <Label>Date</Label>
+        <Popover>
+          <PopoverTrigger as-child>
+            <Button
+              variant="outline"
+              :class="cn('w-full justify-start text-left font-normal', !postDateStr && 'text-muted-foreground')"
+            >
+              <CalendarIcon class="mr-2 h-4 w-4 shrink-0" />
+              {{ new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(postDate.toDate(getLocalTimeZone())) }}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent class="w-auto p-0">
+            <Calendar
+              v-model="postDate"
+              :initial-focus="true"
+              :default-placeholder="today(getLocalTimeZone())"
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
       <div class="space-y-1"><Label>Num</Label><Input v-model="num" placeholder="Check #" /></div>
       <div class="space-y-1 col-span-2"><Label>Description</Label><Input v-model="description" placeholder="Payee or description" /></div>
     </div>
@@ -133,9 +154,8 @@ async function save() {
           <tbody class="divide-y">
             <tr v-for="(split, idx) in splits" :key="split.id">
               <td class="px-3 py-1.5 min-w-[200px]">
-                <Combobox
+                <AccountPicker
                   :model-value="split.accountId"
-                  :items="accountComboboxItems"
                   placeholder="Select account..."
                   @update:model-value="splits[idx].accountId = $event"
                 />
