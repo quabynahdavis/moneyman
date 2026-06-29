@@ -5,6 +5,8 @@ import { Button, Input, Label } from "@/components/ui"
 import { useAccountStore } from "@/stores/accountStore"
 import { ACCOUNT_TYPE_LABELS } from "@/types"
 import type { AccountType } from "@/types"
+import { toast } from "vue-sonner"
+import Combobox from "@/components/Combobox.vue"
 
 const router = useRouter()
 const route = useRoute()
@@ -22,8 +24,8 @@ const code = ref("")
 const description = ref("")
 const isPlaceholder = ref(false)
 const saving = ref(false)
-const error = ref("")
 const loading = ref(false)
+const error = ref("")
 
 const anchorTypes = ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"] as AccountType[]
 
@@ -42,8 +44,10 @@ onMounted(async () => {
       code.value = account.code ?? ""
       description.value = account.description ?? ""
       isPlaceholder.value = account.isPlaceholder
+      toast.success("Account loaded for editing")
     } else {
       error.value = "Account not found"
+      toast.error("Account not found")
     }
   } finally {
     loading.value = false
@@ -57,8 +61,13 @@ function getParentCandidates() {
 }
 
 async function save() {
-  if (!name.value.trim()) { error.value = "Account name is required"; return }
-  saving.value = true; error.value = ""
+  if (!name.value.trim()) {
+    error.value = "Account name is required"
+    toast.error("Account name is required")
+    return
+  }
+  saving.value = true
+  error.value = ""
   try {
     if (isEditing.value) {
       await accountStore.updateExistingAccount({
@@ -70,6 +79,7 @@ async function save() {
         description: description.value || null,
         isPlaceholder: isPlaceholder.value,
       })
+      toast.success("Account updated")
     } else {
       await accountStore.createNewAccount({
         parentId: parentId.value,
@@ -79,10 +89,13 @@ async function save() {
         description: description.value || null,
         isPlaceholder: isPlaceholder.value,
       })
+      toast.success("Account created")
     }
     router.push({ name: "accounts" })
   } catch (e: any) {
-    error.value = typeof e === "string" ? e : "Failed to save account"
+    const msg = typeof e === "string" ? e : "Failed to save account"
+    error.value = msg
+    toast.error(msg)
   } finally { saving.value = false }
 }
 </script>
@@ -95,17 +108,25 @@ async function save() {
 
       <div class="space-y-1">
         <Label>Account Type</Label>
-        <select v-model="accountType" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <option v-for="(label, key) in ACCOUNT_TYPE_LABELS" :key="key" :value="key">{{ label }}</option>
-        </select>
+        <Combobox
+          :model-value="accountType"
+          :items="Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => ({ value, label }))"
+          placeholder="Select account type..."
+          @update:model-value="accountType = $event as AccountType"
+        />
       </div>
 
       <div class="space-y-1">
         <Label>Parent Account</Label>
-        <select v-model="parentId" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <option :value="null">None (Root level)</option>
-          <option v-for="p in getParentCandidates()" :key="p.id" :value="p.id">{{ p.name }} ({{ p.accountType }})</option>
-        </select>
+        <Combobox
+          :model-value="parentId?.toString() ?? ''"
+          :items="[
+            { value: '', label: 'None (Root level)' },
+            ...getParentCandidates().map(p => ({ value: p.id.toString(), label: `${p.name} (${p.accountType})` })),
+          ]"
+          placeholder="Select parent..."
+          @update:model-value="parentId = $event ? Number($event) : null"
+        />
       </div>
 
       <div class="space-y-1"><Label>Account Code</Label><Input v-model="code" placeholder="e.g. 1100" /></div>

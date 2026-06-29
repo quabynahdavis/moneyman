@@ -20,7 +20,7 @@ import {
   ContextMenuPortal,
 } from "reka-ui"
 import { Folder, FileText, Pencil, Trash2 } from "@lucide/vue"
-import { Badge, Button } from "@/components/ui"
+import { Badge } from "@/components/ui"
 import { formatMoney, isNegative } from "@/utils/decimal"
 import { ACCOUNT_TYPE_LABELS } from "@/types"
 import type { AccountNode } from "@/types"
@@ -90,9 +90,12 @@ const contentClass =
                 :class="isNegative(account.balance) ? 'text-rose-500' : ''"
               >{{ formatMoney(account.balance) }}</span>
               <DropdownMenu>
-                <DropdownMenuTrigger
-                  class="h-7 w-7 opacity-0 group-hover/accordion-trigger:opacity-100 shrink-0 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
-                >⋮</DropdownMenuTrigger>
+                <DropdownMenuTrigger as-child>
+                  <div
+                    class="h-7 w-7 opacity-0 group-hover/accordion-trigger:opacity-100 shrink-0 flex items-center justify-center rounded-md hover:bg-muted transition-colors cursor-pointer"
+                    @click.stop
+                  >⋮</div>
+                </DropdownMenuTrigger>
                 <DropdownMenuPortal>
                   <DropdownMenuContent :align="'end'" :class="contentClass">
                     <DropdownMenuItem :class="itemClass" @select="edit(account)">
@@ -107,12 +110,10 @@ const contentClass =
                   </DropdownMenuContent>
                 </DropdownMenuPortal>
               </DropdownMenu>
-              <Button
-                variant="ghost"
-                size="sm"
-                class="h-7 px-2 opacity-0 group-hover/accordion-trigger:opacity-100 shrink-0 font-medium"
+              <span
+                class="h-7 px-2 opacity-0 group-hover/accordion-trigger:opacity-100 shrink-0 font-medium inline-flex items-center justify-center rounded-md text-sm cursor-pointer hover:bg-muted transition-colors select-none"
                 @click.stop="select(account)"
-              >View</Button>
+              >View</span>
             </ContextMenuTrigger>
             <ContextMenuPortal>
               <ContextMenuContent :class="contentClass">
@@ -162,9 +163,12 @@ const contentClass =
             :class="isNegative(account.balance) ? 'text-rose-500' : ''"
           >{{ formatMoney(account.balance) }}</span>
           <DropdownMenu>
-            <DropdownMenuTrigger
-              class="h-7 w-7 opacity-0 group-hover:opacity-100 shrink-0 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
-            >⋮</DropdownMenuTrigger>
+            <DropdownMenuTrigger as-child>
+              <div
+                class="h-7 w-7 opacity-0 group-hover:opacity-100 shrink-0 flex items-center justify-center rounded-md hover:bg-muted transition-colors cursor-pointer"
+                @click.stop
+              >⋮</div>
+            </DropdownMenuTrigger>
             <DropdownMenuPortal>
               <DropdownMenuContent :align="'end'" :class="contentClass">
                 <DropdownMenuItem :class="itemClass" @select="edit(account)">
@@ -179,12 +183,10 @@ const contentClass =
               </DropdownMenuContent>
             </DropdownMenuPortal>
           </DropdownMenu>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0 font-medium"
+          <span
+            class="h-7 px-2 opacity-0 group-hover:opacity-100 shrink-0 font-medium inline-flex items-center justify-center rounded-md text-sm cursor-pointer hover:bg-muted transition-colors select-none"
             @click.stop="select(account)"
-          >View</Button>
+          >View</span>
         </ContextMenuTrigger>
         <ContextMenuPortal>
           <ContextMenuContent :class="contentClass">

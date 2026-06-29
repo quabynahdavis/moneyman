@@ -21,6 +21,8 @@ import {
 } from "@lucide/vue"
 import { ref, computed, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
+import { Toaster } from "vue-sonner"
+import ConfirmDialog from "@/components/ConfirmDialog.vue"
 
 const ui = useUiStore()
 const router = useRouter()
@@ -199,4 +201,11 @@ function refreshCurrentPage() {
       </div>
     </main>
   </div>
+  <Toaster
+    position="bottom-right"
+    :rich-colors="true"
+    :close-button="true"
+    :duration="4000"
+  />
+  <ConfirmDialog />
 </template>

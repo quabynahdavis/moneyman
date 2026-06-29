@@ -6,9 +6,12 @@ import { useAccountStore } from "@/stores/accountStore"
 import { useRouter } from "vue-router"
 import { Plus, RefreshCw } from "@lucide/vue"
 import type { AccountNode } from "@/types"
+import { toast } from "vue-sonner"
+import { useConfirm } from "@/composables/useConfirm"
 
 const accountStore = useAccountStore()
 const router = useRouter()
+const { confirm } = useConfirm()
 
 onMounted(() => accountStore.fetchAccounts())
 
@@ -25,12 +28,18 @@ function onEdit(node: AccountNode) {
 }
 
 async function onDelete(node: AccountNode) {
-  const confirmed = confirm(`Delete account "${node.name}"? This cannot be undone.`)
-  if (!confirmed) return
+  const ok = await confirm({
+    title: "Delete Account",
+    message: `Delete account "${node.name}"? This cannot be undone.`,
+    confirmLabel: "Delete",
+    variant: "destructive",
+  })
+  if (!ok) return
   try {
     await accountStore.deleteExistingAccount(node.id)
+    toast.success("Account deleted")
   } catch (e: any) {
-    alert(typeof e === "string" ? e : "Failed to delete account")
+    toast.error(typeof e === "string" ? e : "Failed to delete account")
   }
 }
 </script>
